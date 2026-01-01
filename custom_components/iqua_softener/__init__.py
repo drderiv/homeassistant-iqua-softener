@@ -36,10 +36,14 @@ async def async_setup_entry(
     update_interval_minutes = hass_data.get(
         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
     )
+    # Ensure update_interval is an integer (in minutes) and convert to seconds for timedelta
+    update_interval_minutes = int(update_interval_minutes) if update_interval_minutes else DEFAULT_UPDATE_INTERVAL
+    update_interval_seconds = update_interval_minutes * 60
     enable_websocket = hass_data.get(CONF_ENABLE_WEBSOCKET, DEFAULT_ENABLE_WEBSOCKET)
     _LOGGER.info(
-        "Creating coordinator with update interval: %d minutes, WebSocket: %s",
+        "Creating coordinator with update interval: %d minutes (%d seconds), WebSocket: %s",
         update_interval_minutes,
+        update_interval_seconds,
         enable_websocket,
     )
     # Extract serial numbers from config
@@ -58,7 +62,7 @@ async def async_setup_entry(
             product_serial_number=product_sn,
             enable_websocket=enable_websocket,  # Let the library handle WebSocket
         ),
-        update_interval_minutes,
+        update_interval_seconds,
         enable_websocket,
         hass_data,  # Pass config data for URL configuration
     )

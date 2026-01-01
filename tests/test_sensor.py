@@ -36,7 +36,7 @@ class TestIquaSoftenerCoordinator:
         coordinator = IquaSoftenerCoordinator(
             hass,
             mock_iqua_softener,
-            update_interval_minutes=5,
+            update_interval_seconds=300,  # 5 minutes in seconds
             enable_websocket=True,
             config_data=config_entry_data,
         )

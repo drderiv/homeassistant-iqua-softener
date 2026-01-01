@@ -248,7 +248,7 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         self,
         hass: core.HomeAssistant,
         iqua_softener: IquaSoftener,
-        update_interval_minutes: int = DEFAULT_UPDATE_INTERVAL,
+        update_interval_seconds: int = DEFAULT_UPDATE_INTERVAL * 60,
         enable_websocket: bool = True,
         config_data: Optional[dict] = None,
     ):
@@ -256,12 +256,12 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="Iqua Softener",
-            update_interval=timedelta(minutes=update_interval_minutes),
+            update_interval=timedelta(seconds=update_interval_seconds),
         )
         self._iqua_softener = iqua_softener
         self._enable_websocket = enable_websocket
         self._config_data = config_data or {}
-        self._initial_update_interval = timedelta(minutes=update_interval_minutes)
+        self._initial_update_interval = timedelta(seconds=update_interval_seconds)
 
         # Store credentials for authentication recovery
         self._username: Optional[str] = self._config_data.get("username")
@@ -276,8 +276,9 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         self._failure_count = 0
 
         _LOGGER.info(
-            "IquaSoftenerCoordinator initialized with %d minute update interval, WebSocket: %s",
-            update_interval_minutes,
+            "IquaSoftenerCoordinator initialized with %d second update interval (%.1f minutes), WebSocket: %s",
+            update_interval_seconds,
+            update_interval_seconds / 60,
             enable_websocket,
         )
 
