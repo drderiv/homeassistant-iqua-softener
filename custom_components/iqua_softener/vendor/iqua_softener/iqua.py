@@ -358,12 +358,20 @@ class IquaSoftener:
         device_id = self._get_device_id()
         url = f"/devices/{device_id}/settings"
         payload = {setting_name: setting_value}
-        response = self._request("PUT", url, json=payload)
-        if response.status_code != 200:
+        response = self._request("PATCH", url, json=payload)
+        
+        if response.status_code not in [200, 201, 204]:
             raise IquaSoftenerException(
                 f"Invalid status ({response.status_code}) for set device setting request"
             )
-        return response.json()
+        
+        # Handle cases where there's no response body (204 No Content)
+        if response.status_code == 204:
+            return {}
+        try:
+            return response.json()
+        except:
+            return {}
 
     def has_water_shutoff_valve(self) -> bool:
         """Check if the device has a water shutoff valve installed."""
