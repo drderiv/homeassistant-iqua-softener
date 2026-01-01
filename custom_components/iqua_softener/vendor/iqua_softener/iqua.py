@@ -355,36 +355,47 @@ class IquaSoftener:
         Returns:
             Response data from the API
         """
+        import logging
+        import requests
+        logger = logging.getLogger(__name__)
+        
         device_id = self._get_device_id()
         url = f"/devices/{device_id}/settings"
         
-        # Try different payload formats to match API expectations
-        # First try: wrapped in "settings" object with array format
-        payload = {"settings": [{"name": setting_name, "value": setting_value}]}
-        response = self._request("PATCH", url, json=payload)
+        # API expects: {"settings": {"setting_name": "value"}}
+        payload = {"settings": {setting_name: setting_value}}
         
-        if response.status_code == 422:
-            # Second try: simple dict format {setting_name: value}
-            payload = {setting_name: setting_value}
-            response = self._request("PATCH", url, json=payload)
-        
-        if response.status_code == 422:
-            # Third try: wrapped in "settings" object as dict
-            payload = {"settings": {setting_name: setting_value}}
-            response = self._request("PATCH", url, json=payload)
-        
-        if response.status_code not in [200, 201, 204]:
-            raise IquaSoftenerException(
-                f"Invalid status ({response.status_code}) for set device setting request"
-            )
-        
-        # Handle cases where there's no response body (204 No Content)
-        if response.status_code == 204:
-            return {}
         try:
-            return response.json()
-        except:
-            return {}
+            logger.debug(f"Setting {setting_name} to {setting_value}")
+            self._ensure_session()
+            assert self._session is not None
+            response = self._session.patch(
+                f"{self._api_base_url}{url}",
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code not in [200, 201, 204]:
+                try:
+                    error_detail = response.json()
+                    error_msg = f"Failed to set device setting. Status {response.status_code}: {error_detail}"
+                except:
+                    error_msg = f"Failed to set device setting. Status {response.status_code}: {response.text}"
+                logger.error(error_msg)
+                raise IquaSoftenerException(error_msg)
+            
+            # Handle cases where there's no response body (204 No Content)
+            if response.status_code == 204:
+                return {}
+            try:
+                return response.json()
+            except:
+                return {}
+                    
+        except requests.RequestException as e:
+            error_msg = f"Failed to set device setting: {e}"
+            logger.error(error_msg)
+            raise IquaSoftenerException(error_msg)
 
     def has_water_shutoff_valve(self) -> bool:
         """Check if the device has a water shutoff valve installed."""
