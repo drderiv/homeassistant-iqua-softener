@@ -141,7 +141,9 @@ class TestIquaSoftenerConfigFlow:
 
         with patch("custom_components.iqua_softener.config_flow.IquaSoftener") as mock_iqua_class:
             mock_iqua_instance = MagicMock()
-            mock_iqua_instance.get_data = MagicMock(side_effect=Exception("Connection failed"))
+            # Use IquaSoftenerException for connection errors to get proper error code
+            from custom_components.iqua_softener.vendor.iqua_softener import IquaSoftenerException
+            mock_iqua_instance.get_data = MagicMock(side_effect=IquaSoftenerException("Connection failed"))
             mock_iqua_class.return_value = mock_iqua_instance
 
             result = await flow._validate_input({
