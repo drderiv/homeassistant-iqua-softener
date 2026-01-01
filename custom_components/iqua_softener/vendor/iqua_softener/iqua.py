@@ -12,7 +12,10 @@ from typing import Optional, Dict, Any, Callable
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    from backports.zoneinfo import ZoneInfo
+    try:
+        from backports.zoneinfo import ZoneInfo
+    except ImportError:
+        ZoneInfo = None
 
 import requests
 
@@ -128,7 +131,7 @@ class IquaSoftener:
             """Get value from enriched_data."""
             return enriched.get(name, default)
 
-        def realtime_val(name: str, fallback_name: str = None, default=None):
+        def realtime_val(name: str, fallback_name: Optional[str] = None, default=None):
             """Get value from real-time data if available, otherwise fallback to API data."""
             realtime_value = self.get_realtime_property(name)
             if realtime_value is not None:
@@ -145,19 +148,32 @@ class IquaSoftener:
         if device_date_str:
             try:
                 # Parse the device date, assuming it's in ISO format
-                device_date_time = datetime.fromisoformat(
-                    device_date_str.rstrip("Z")
-                ).replace(tzinfo=ZoneInfo("UTC"))
+                parsed_datetime = datetime.fromisoformat(device_date_str.rstrip("Z"))
+                if ZoneInfo is not None:
+                    device_date_time = parsed_datetime.replace(tzinfo=ZoneInfo("UTC"))
+                else:
+                    device_date_time = parsed_datetime.replace(tzinfo=None)
             except (ValueError, AttributeError):
-                device_date_time = datetime.now(tz=ZoneInfo("UTC"))
+                if ZoneInfo is not None:
+                    device_date_time = datetime.now(tz=ZoneInfo("UTC"))
+                else:
+                    device_date_time = datetime.now()
         else:
-            device_date_time = datetime.now(tz=ZoneInfo("UTC"))
+            if ZoneInfo is not None:
+                device_date_time = datetime.now(tz=ZoneInfo("UTC"))
+            else:
+                device_date_time = datetime.now()
 
         # Use real-time service_active if available
         service_active = realtime_val("service_active", "service_active", True)
 
+        if ZoneInfo is not None:
+            timestamp = datetime.now(tz=ZoneInfo("UTC"))
+        else:
+            timestamp = datetime.now()
+
         return IquaSoftenerData(
-            timestamp=datetime.now(tz=ZoneInfo("UTC")),
+            timestamp=timestamp,
             model=f"{model_desc} ({model_id})",
             state=(
                 IquaSoftenerState.ONLINE
@@ -428,6 +444,11 @@ class IquaSoftener:
                 full_uri = f"wss://api.myiquaapp.com{ws_uri}"
                 logger.info(f"Connecting to WebSocket: {full_uri}")
 
+                if websockets is None:
+                    logger.error("WebSocket library not available")
+                    await asyncio.sleep(30)
+                    continue
+
                 async with websockets.connect(full_uri) as websocket:
                     logger.info("WebSocket connected successfully")
                     self._websocket_task = asyncio.current_task()
@@ -535,7 +556,7 @@ class IquaSoftener:
     def _get_device_id(self) -> str:
         """Get the device ID for the configured serial number."""
         if self._device_id is not None:
-            return self._device_id
+            return str(self._device_id)
 
         # Get all devices and find the one with matching serial number
         devices = self._get_devices()
@@ -547,14 +568,14 @@ class IquaSoftener:
                 device_serial = props.get("serial_number", {}).get("value")
                 if device_serial == self._device_serial_number:
                     self._device_id = device["id"]
-                    return self._device_id
+                    return str(self._device_id)
             
             # Check product_serial_number field if provided
             if self._product_serial_number:
                 product_serial = props.get("product_serial_number", {}).get("value")
                 if product_serial == self._product_serial_number:
                     self._device_id = device["id"]
-                    return self._device_id
+                    return str(self._device_id)
 
         # Build error message based on what was provided
         if self._device_serial_number and self._product_serial_number:
@@ -593,6 +614,8 @@ class IquaSoftener:
                 self._access_expires_at = None
 
         self._ensure_session()
+        # After _ensure_session(), _session should not be None
+        assert self._session is not None, "Session should be initialized"
         if self._access_token:
             self._session.headers.update(
                 {"Authorization": f"Bearer {self._access_token}"}
@@ -609,6 +632,8 @@ class IquaSoftener:
     def _login(self) -> Dict[str, Any]:
         """Authenticate with the API and get tokens."""
         self._ensure_session()
+        # After _ensure_session(), _session should not be None
+        assert self._session is not None, "Session should be initialized"
         url = f"{self._api_base_url}/auth/login"
         payload = {"email": self._username, "password": self._password}
         try:
@@ -632,6 +657,8 @@ class IquaSoftener:
             raise IquaSoftenerException("No refresh token available")
 
         self._ensure_session()
+        # After _ensure_session(), _session should not be None
+        assert self._session is not None, "Session should be initialized"
         url = f"{self._api_base_url}/auth/refresh"
         payload = {"refresh_token": self._refresh_token}
         try:
@@ -661,6 +688,9 @@ class IquaSoftener:
         """Make an authenticated request to the API."""
         self._ensure_authenticated()
         self._ensure_session()
+
+        # After _ensure_session(), _session should not be None
+        assert self._session is not None, "Session should be initialized"
 
         url = (
             path

@@ -107,17 +107,39 @@ async def options_update_listener(
 async def async_unload_entry(
     hass: core.HomeAssistant, entry: config_entries.ConfigEntry
 ) -> bool:
-    # Stop the WebSocket connection
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    await coordinator.async_stop_websocket()
+    """Unload a config entry with proper cleanup.
+    
+    Performs graceful shutdown:
+    - Stops WebSocket connection if active
+    - Cancels pending coordinator tasks
+    - Removes options update listener
+    - Unloads all platforms
+    - Cleans up stored data
+    """
+    entry_data = hass.data[DOMAIN].get(entry.entry_id)
+    
+    if entry_data:
+        # Stop the WebSocket connection
+        coordinator = entry_data.get("coordinator")
+        if coordinator:
+            try:
+                await coordinator.async_stop_websocket()
+            except Exception as err:
+                _LOGGER.warning("Error stopping WebSocket: %s", err)
+        
+        # Remove options update listener
+        unsub_listener = entry_data.get("unsub_options_update_listener")
+        if unsub_listener:
+            unsub_listener()
 
+    # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(
         entry, ["sensor", "switch"]
     )
 
-    hass.data[DOMAIN][entry.entry_id]["unsub_options_update_listener"]()
-
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        if not hass.data[DOMAIN]:
+            hass.data.pop(DOMAIN)
 
     return unload_ok

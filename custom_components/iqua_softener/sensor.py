@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, cast
 
 from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import (
@@ -79,7 +79,7 @@ async def async_setup_entry(
         return
 
     # Define all sensors except water shutoff valve state (which is conditional)
-    base_sensors = [
+    base_sensors: list[IquaSoftenerSensor] = [
         clz(coordinator, device_serial_number, entity_description)
         for clz, entity_description in (
             (
@@ -187,7 +187,14 @@ async def async_setup_entry(
         _LOGGER.info("Initializing sensor values immediately with current data...")
         for sensor in sensors:
             try:
-                sensor.update(coordinator.data)
+                # Cast coordinator data to the expected type
+                coordinator_data = coordinator.data
+                if isinstance(coordinator_data, dict):
+                    # If it's still a dict, we can't process it
+                    _LOGGER.warning("Coordinator data is not in expected format for sensor %s", sensor.entity_description.name)
+                    continue
+                
+                sensor.update(coordinator_data)
                 sensor.async_write_ha_state()
             except Exception as err:
                 _LOGGER.error("Error initializing sensor %s: %s", sensor.entity_description.name, err)
@@ -197,13 +204,31 @@ async def async_setup_entry(
 
 
 class IquaSoftenerCoordinator(DataUpdateCoordinator):
+    """Coordinator for iQua Softener device data updates.
+    
+    Manages polling of iQua cloud API with exponential backoff on failures.
+    API Reference: https://api.myiquaapp.com/v1/docs
+    
+    Features:
+    - Periodic polling (configurable 1-60 minutes)
+    - WebSocket support for real-time updates
+    - Exponential backoff on repeated failures
+    - Automatic recovery with fresh authentication
+    - 30-second API timeout with error recovery
+    """
+    
+    # Backoff strategy constants
+    INITIAL_INTERVAL_MINUTES = DEFAULT_UPDATE_INTERVAL
+    MAX_INTERVAL_MINUTES = 60  # Maximum 1 hour between retries
+    BACKOFF_MULTIPLIER = 2  # Double interval on each failure
+    
     def __init__(
         self,
         hass: core.HomeAssistant,
         iqua_softener: IquaSoftener,
         update_interval_minutes: int = DEFAULT_UPDATE_INTERVAL,
         enable_websocket: bool = True,
-        config_data: dict = None,
+        config_data: Optional[dict] = None,
     ):
         super().__init__(
             hass,
@@ -214,15 +239,19 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         self._iqua_softener = iqua_softener
         self._enable_websocket = enable_websocket
         self._config_data = config_data or {}
+        self._initial_update_interval = timedelta(minutes=update_interval_minutes)
 
         # Store credentials for authentication recovery
-        self._username = self._config_data.get("username")
-        self._password = self._config_data.get("password")
+        self._username: Optional[str] = self._config_data.get("username")
+        self._password: Optional[str] = self._config_data.get("password")
         self._device_serial_number = self._config_data.get("device_sn")
         self._product_serial_number = self._config_data.get("product_sn")
 
         # Flag to delay WebSocket start until after bootstrap
         self._websocket_start_delayed = False
+        
+        # Backoff strategy tracking
+        self._failure_count = 0
 
         _LOGGER.info(
             "IquaSoftenerCoordinator initialized with %d minute update interval, WebSocket: %s",
@@ -273,6 +302,16 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Manual data refresh failed: %s", err)
 
     async def _async_update_data(self) -> IquaSoftenerData:
+        """Fetch data from iQua cloud API with exponential backoff on failures.
+        
+        Implements backoff strategy:
+        - Initial interval: configured update interval (1-60 minutes)
+        - On failure: doubles interval up to 60 minutes
+        - On success: resets to initial interval
+        
+        API Reference: https://api.myiquaapp.com/v1/docs
+        Timeout: 30 seconds per request
+        """
         _LOGGER.debug("Starting data fetch from iQua API...")
         
         # Start WebSocket after first successful data fetch (post-bootstrap)
@@ -284,13 +323,22 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
             self.hass.async_create_task(self.async_start_websocket())
         
         try:
-            data = await self.hass.async_add_executor_job(
+            data: Optional[IquaSoftenerData] = await self.hass.async_add_executor_job(
                 lambda: self._iqua_softener.get_data()
             )
             
             if data is None:
                 _LOGGER.error("API returned None data - sensors will show as unknown")
                 raise UpdateFailed("API returned no data")
+            
+            # Reset failure counter and interval on success
+            if self._failure_count > 0:
+                _LOGGER.info(
+                    "API recovered after %d failed attempts, resetting to normal polling interval",
+                    self._failure_count,
+                )
+                self._failure_count = 0
+                self.update_interval = self._initial_update_interval
             
             # Log timezone information for debugging
             if hasattr(data, 'device_date_time') and data.device_date_time:
@@ -312,21 +360,27 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
                     _LOGGER.info("Attempting to recreate iQua client to reset authentication")
                     from .vendor.iqua_softener import IquaSoftener
 
-                    self._iqua_softener = IquaSoftener(
-                        self._username,
-                        self._password,
-                        device_serial_number=self._device_serial_number,
-                        product_serial_number=self._product_serial_number,
-                    )
-                    # Try the request again with fresh client
-                    data = await self.hass.async_add_executor_job(
-                        lambda: self._iqua_softener.get_data()
-                    )
+                    if self._username and self._password:
+                        self._iqua_softener = IquaSoftener(
+                            self._username,
+                            self._password,
+                            device_serial_number=self._device_serial_number,
+                            product_serial_number=self._product_serial_number,
+                        )
+                        # Try the request again with fresh client
+                        data = await self.hass.async_add_executor_job(
+                            lambda: self._iqua_softener.get_data()
+                        )
+                    else:
+                        raise UpdateFailed("Missing credentials for authentication recovery")
                     
                     if data is None:
                         _LOGGER.error("API recovery returned None data")
                         raise UpdateFailed("API recovery returned no data")
                     
+                    # Reset failure counter on successful recovery
+                    self._failure_count = 0
+                    self.update_interval = self._initial_update_interval
                     _LOGGER.info("✅ API recovery successful")
 
                     # Also restart WebSocket with fresh client if enabled
@@ -336,32 +390,65 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
                     return data
                 except Exception as recovery_err:
                     _LOGGER.error("Failed to recover from authentication error: %s", recovery_err)
+                    self._apply_backoff_strategy()
                     raise UpdateFailed(f"iQua library authentication error: {err}")
             else:
                 _LOGGER.error("Unexpected TypeError in iQua API call: %s", err)
+                self._apply_backoff_strategy()
                 raise UpdateFailed(f"Unexpected error: {err}")
         except IquaSoftenerException as err:
             _LOGGER.error("API data fetch failed: %s", err)
+            self._apply_backoff_strategy()
             raise UpdateFailed(f"Get data failed: {err}")
         except Exception as err:
             _LOGGER.error("Unexpected error fetching API data: %s", err)
+            self._apply_backoff_strategy()
             raise UpdateFailed(f"Unexpected error: {err}")
+    
+    def _apply_backoff_strategy(self) -> None:
+        """Apply exponential backoff strategy on API failures.
+        
+        Increases polling interval up to 60 minutes to reduce load on API.
+        Resets when API recovers.
+        """
+        self._failure_count += 1
+        
+        # Calculate new interval with exponential backoff
+        minutes_multiplier = min(
+            self.BACKOFF_MULTIPLIER ** (self._failure_count - 1),
+            self.MAX_INTERVAL_MINUTES // self.INITIAL_INTERVAL_MINUTES,
+        )
+        new_interval_minutes = min(
+            self.INITIAL_INTERVAL_MINUTES * minutes_multiplier,
+            self.MAX_INTERVAL_MINUTES,
+        )
+        new_interval = timedelta(minutes=new_interval_minutes)
+        
+        if self.update_interval != new_interval:
+            self.update_interval = new_interval
+            _LOGGER.warning(
+                "API error (attempt %d), applying exponential backoff - "
+                "next retry in %d minutes",
+                self._failure_count,
+                new_interval_minutes,
+            )
 
 
 class IquaSoftenerSensor(SensorEntity, CoordinatorEntity, ABC):
+    coordinator: IquaSoftenerCoordinator  # Type hint override for proper attribute access
+    
     def __init__(
         self,
         coordinator: IquaSoftenerCoordinator,
         device_serial_number: str,
-        entity_description: SensorEntityDescription = None,
+        entity_description: Optional[SensorEntityDescription] = None,
     ):
         super().__init__(coordinator)
         self._device_serial_number = device_serial_number
-        self._attr_unique_id = (
-            f"{device_serial_number}_{entity_description.key}".lower()
-        )
-
         if entity_description is not None:
+            self._attr_unique_id = (
+                f"{device_serial_number}_{entity_description.key}".lower()
+            )
             self.entity_description = entity_description
 
     @callback
@@ -370,8 +457,15 @@ class IquaSoftenerSensor(SensorEntity, CoordinatorEntity, ABC):
             if self.coordinator.data is None:
                 _LOGGER.warning("%s: No data available from coordinator", self.entity_description.name)
                 return
-                
-            self.update(self.coordinator.data)
+            
+            # Cast coordinator data to the expected type
+            coordinator_data = self.coordinator.data
+            if isinstance(coordinator_data, dict):
+                # If it's still a dict, we can't process it
+                _LOGGER.warning("%s: Coordinator data is not in expected format", self.entity_description.name)
+                return
+            
+            self.update(coordinator_data)
             self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Error updating %s sensor: %s", self.entity_description.name, err)
@@ -456,7 +550,7 @@ class IquaSoftenerSaltLevelSensor(IquaSoftenerSensor):
             old_value = getattr(self, '_attr_native_value', None)
             self._attr_native_value = data.salt_level_percent
             
-            if old_value != self._attr_native_value:
+            if old_value != self._attr_native_value and isinstance(self._attr_native_value, (int, float)):
                 _LOGGER.debug("Salt level changed: %s%% → %s%%", old_value, self._attr_native_value)
         except Exception as err:
             _LOGGER.error("Error updating salt level sensor: %s", err)
@@ -465,7 +559,7 @@ class IquaSoftenerSaltLevelSensor(IquaSoftenerSensor):
 
     @property
     def icon(self) -> Optional[str]:
-        if self._attr_native_value is not None:
+        if self._attr_native_value is not None and isinstance(self._attr_native_value, (int, float)):
             if self._attr_native_value > 75:
                 return "mdi:signal-cellular-3"
             elif self._attr_native_value > 50:
@@ -504,7 +598,8 @@ class IquaSoftenerWaterCurrentFlowSensor(IquaSoftenerSensor):
     def update(self, data: IquaSoftenerData):
         try:
             # Use the library's get_realtime_property method for real-time flow data
-            realtime_flow = self.coordinator._iqua_softener.get_realtime_property(
+            coordinator = cast(IquaSoftenerCoordinator, self.coordinator)
+            realtime_flow = coordinator._iqua_softener.get_realtime_property(
                 "current_water_flow_gpm"
             )
             

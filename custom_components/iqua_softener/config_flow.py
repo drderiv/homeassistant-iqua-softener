@@ -127,7 +127,14 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(self, user_input: Optional[Dict[str, Any]] = None):
         """Handle reconfiguration of the integration."""
-        config_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        entry_id = self.context.get("entry_id")
+        if entry_id is None:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=DATA_SCHEMA_USER,
+                errors={"base": "invalid_entry"},
+            )
+        config_entry = self.hass.config_entries.async_get_entry(entry_id)
         errors: Dict[str, str] = {}
         
         if user_input is not None:
@@ -151,13 +158,24 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 if validation_result["success"]:
                     # Update the config entry
-                    return self.async_update_reload_and_abort(
-                        config_entry, data=user_input
-                    )
+                    if config_entry is not None:
+                        return self.async_update_reload_and_abort(
+                            config_entry, data=user_input
+                        )
+                    else:
+                        errors["base"] = "invalid_entry"
                 else:
                     errors["base"] = validation_result["error"]
 
         # Pre-fill form with existing data
+        if config_entry is None:
+            # Return to user step if config entry not found
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=DATA_SCHEMA_USER,
+                errors={"base": "invalid_entry"},
+            )
+        
         current_data = config_entry.data
         default_schema = vol.Schema(
             {
