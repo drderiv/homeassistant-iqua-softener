@@ -5,6 +5,43 @@ All notable changes to the iQua Softener Home Assistant integration will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-01
+
+### Added
+- **Device Settings Configuration**: New select platform for configurable device settings
+  - Added support for 6 device settings: Salt Type, Inlet Water Hardness, Regeneration Time, Efficiency Mode, Max Days Between Recharges, and 97% Feature
+  - Each setting is exposed as a Home Assistant select entity with dynamically populated options
+  - Users can now configure device settings directly from Home Assistant UI
+  - Added `get_device_settings()` method to fetch available settings and their current values from the API
+  - Added `set_device_setting()` method to update device settings via PATCH request to `/devices/{id}/settings` endpoint
+- **WiFi Signal Strength Sensor**: New sensor entity displaying WiFi signal strength in dBm
+  - Added `IquaSoftenerWifiSignalStrengthSensor` class with real-time updates via WebSocket
+  - Displays WiFi signal strength with proper unit of measurement
+- **Water Hardness Sensor**: New read-only sensor displaying current water hardness in GPG (grains per gallon)
+  - Added `IquaSoftenerWaterHardnessSensor` class for monitoring inlet water hardness
+  - Provides feedback on current hardness level configured in the device
+- **Diagnostics Support**: Enhanced diagnostics with more detailed information
+  - Added 7 new diagnostic tests covering configuration, coordinator state, device data, and platforms
+- **WebSocket Real-time Updates**: Real-time sensor updates when device data changes
+  - Implemented WebSocket callback mechanism for immediate sensor updates
+  - Coordinator now triggers refresh when WebSocket data arrives
+  - Added `async_start_websocket()` and `async_stop_websocket()` methods to coordinator
+  - WebSocket connection managed properly during setup and unload lifecycle
+
+### Fixed
+- **Configuration Flow Data Persistence**: Fixed options not persisting correctly
+  - Implemented dict merge pattern in `async_step_reconfigure()` to preserve all configuration fields
+  - Ensures update_interval and enable_websocket settings are retained when reconfiguring credentials
+- **Device Settings API Integration**: Corrected PATCH request format for device settings
+  - Fixed payload format to match API expectations: `{"settings": {"setting_name": "value"}}`
+  - Updated `set_device_setting()` to use PATCH method with proper request handling
+
+### Enhanced
+- **Component Architecture**: New select platform registration for device settings
+- **Real-time Updates**: Improved responsiveness with WebSocket callback integration
+- **Sensor Coverage**: Extended sensor suite with WiFi and water hardness monitoring
+- **Total Sensor Count**: Now provides 12+ sensors covering device state, usage, salt level, flow, timing, WiFi, and hardness
+
 ## [2.0.3] - 2025-11-09
 
 ### Added
