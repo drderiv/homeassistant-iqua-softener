@@ -357,8 +357,21 @@ class IquaSoftener:
         """
         device_id = self._get_device_id()
         url = f"/devices/{device_id}/settings"
-        payload = {setting_name: setting_value}
+        
+        # Try different payload formats to match API expectations
+        # First try: wrapped in "settings" object with array format
+        payload = {"settings": [{"name": setting_name, "value": setting_value}]}
         response = self._request("PATCH", url, json=payload)
+        
+        if response.status_code == 422:
+            # Second try: simple dict format {setting_name: value}
+            payload = {setting_name: setting_value}
+            response = self._request("PATCH", url, json=payload)
+        
+        if response.status_code == 422:
+            # Third try: wrapped in "settings" object as dict
+            payload = {"settings": {setting_name: setting_value}}
+            response = self._request("PATCH", url, json=payload)
         
         if response.status_code not in [200, 201, 204]:
             raise IquaSoftenerException(
