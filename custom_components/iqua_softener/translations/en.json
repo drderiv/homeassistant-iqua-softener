@@ -81,6 +81,26 @@
       "water_shutoff_valve": {
         "name": "Water Shutoff Valve"
       }
+    },
+    "select": {
+      "salt_type": {
+        "name": "Salt Type"
+      },
+      "inlet_hardness": {
+        "name": "Inlet Water Hardness"
+      },
+      "regeneration_time": {
+        "name": "Regeneration Time"
+      },
+      "efficiency_mode": {
+        "name": "Efficiency Mode"
+      },
+      "max_days_between_recharges": {
+        "name": "Max Days Between Recharges"
+      },
+      "feature_97_percent": {
+        "name": "97% Feature"
+      }
     }
   }
 }

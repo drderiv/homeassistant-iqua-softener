@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import asyncio
 from datetime import datetime, timedelta
 import logging
 from typing import Optional, Any, cast
@@ -288,6 +289,19 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
 
         try:
             _LOGGER.info("Starting WebSocket using library's built-in implementation...")
+            
+            # Register callback for WebSocket data updates to trigger sensor refresh
+            def on_websocket_update(property_name: str):
+                """Callback when WebSocket data updates - trigger sensor refresh."""
+                _LOGGER.debug("WebSocket property updated: %s - refreshing coordinator", property_name)
+                # Schedule coordinator update on the event loop
+                asyncio.run_coroutine_threadsafe(
+                    self.async_request_refresh(),
+                    self.hass.loop
+                )
+            
+            self._iqua_softener.set_websocket_data_update_callback(on_websocket_update)
+            
             await self.hass.async_add_executor_job(self._iqua_softener.start_websocket)
             _LOGGER.info("WebSocket started successfully using library")
         except Exception as err:

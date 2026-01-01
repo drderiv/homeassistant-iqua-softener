@@ -8,6 +8,9 @@
   "requirements": ["requests", "PyJWT"],
   "config_flow": true,
   "iot_class": "cloud_polling",
+  "homeassistant": {
+    "platforms": ["sensor", "switch", "select"]
+  },
   "loggers": ["iqua"],
   "version": "2.0.3",
   "documentation_url": "https://api.myiquaapp.com/v1/docs"

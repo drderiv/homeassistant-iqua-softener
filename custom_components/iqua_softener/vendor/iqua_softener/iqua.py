@@ -109,6 +109,9 @@ class IquaSoftener:
 
         # External real-time data (for Home Assistant integration)
         self._external_realtime_data = external_realtime_data
+        
+        # Callback for WebSocket data updates (for Home Assistant integration)
+        self._on_websocket_data_update: Optional[Callable[[str], None]] = None
 
     @property
     def device_serial_number(self) -> Optional[str]:
@@ -117,6 +120,14 @@ class IquaSoftener:
     @property
     def product_serial_number(self) -> Optional[str]:
         return self._product_serial_number
+    
+    def set_websocket_data_update_callback(self, callback: Optional[Callable[[str], None]]) -> None:
+        """Register a callback function to be called when WebSocket data updates.
+        
+        Args:
+            callback: Function that takes property_name (str) as parameter, or None to unregister
+        """
+        self._on_websocket_data_update = callback
 
     def get_data(self) -> IquaSoftenerData:
         device_id = self._get_device_id()
@@ -319,6 +330,41 @@ class IquaSoftener:
         device_id = self._get_device_id()
         return self._get_device_detail(device_id)
 
+    def get_device_settings(self) -> dict:
+        """Get device settings and their current values.
+        
+        Returns:
+            Dictionary with settings information including current values and options
+        """
+        device_id = self._get_device_id()
+        url = f"/devices/{device_id}/settings"
+        response = self._request("GET", url)
+        if response.status_code != 200:
+            raise IquaSoftenerException(
+                f"Invalid status ({response.status_code}) for get device settings request"
+            )
+        return response.json()
+
+    def set_device_setting(self, setting_name: str, setting_value: str) -> dict:
+        """Set a device setting to a new value.
+        
+        Args:
+            setting_name: The name of the setting (e.g., 'salt_type', 'regeneration_time')
+            setting_value: The new value for the setting
+            
+        Returns:
+            Response data from the API
+        """
+        device_id = self._get_device_id()
+        url = f"/devices/{device_id}/settings"
+        payload = {setting_name: setting_value}
+        response = self._request("PUT", url, json=payload)
+        if response.status_code != 200:
+            raise IquaSoftenerException(
+                f"Invalid status ({response.status_code}) for set device setting request"
+            )
+        return response.json()
+
     def has_water_shutoff_valve(self) -> bool:
         """Check if the device has a water shutoff valve installed."""
         try:
@@ -506,6 +552,13 @@ class IquaSoftener:
             logger.debug(
                 f"Updated real-time property: {property_name} = {data.get('value')}"
             )
+            
+            # Notify callback if registered (for Home Assistant integration)
+            if self._on_websocket_data_update:
+                try:
+                    self._on_websocket_data_update(property_name)
+                except Exception as e:
+                    logger.error(f"Error calling WebSocket data update callback: {e}")
 
     def save_tokens(self, path: str):
         """Save authentication tokens to a file."""
