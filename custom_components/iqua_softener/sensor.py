@@ -157,6 +157,17 @@ async def async_setup_entry(
                     icon="mdi:water-circle",
                 ),
             ),
+            (
+                IquaSoftenerWiFiSignalStrengthSensor,
+                SensorEntityDescription(
+                    key="WIFI_SIGNAL_STRENGTH",
+                    name="WiFi signal strength",
+                    state_class=SensorStateClass.MEASUREMENT,
+                    device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+                    native_unit_of_measurement="dBm",
+                    icon="mdi:wifi",
+                ),
+            ),
         )
     ]
     
@@ -693,3 +704,56 @@ class IquaSoftenerWaterShutoffValveStateSensor(IquaSoftenerSensor):
             return "mdi:valve-closed"
         else:
             return "mdi:valve"
+
+
+class IquaSoftenerWiFiSignalStrengthSensor(IquaSoftenerSensor):
+    """WiFi signal strength sensor that gets updated from WebSocket real-time data."""
+    
+    def update(self, data: IquaSoftenerData):
+        try:
+            # Use the library's get_realtime_property method for real-time WiFi signal data
+            coordinator = cast(IquaSoftenerCoordinator, self.coordinator)
+            realtime_signal = coordinator._iqua_softener.get_realtime_property(
+                "rf_signal_strength_dbm"
+            )
+            
+            old_value = getattr(self, '_attr_native_value', None)
+            
+            if realtime_signal is not None:
+                # Use real-time WebSocket data
+                self._attr_native_value = realtime_signal
+                if old_value != self._attr_native_value:
+                    _LOGGER.debug("WiFi signal strength updated from WebSocket: %s dBm", realtime_signal)
+            else:
+                # No API fallback for WiFi signal - only available via WebSocket
+                self._attr_native_value = None
+                
+        except Exception as err:
+            _LOGGER.error("Error updating WiFi signal strength sensor: %s", err)
+            if not hasattr(self, '_attr_native_value'):
+                self._attr_native_value = None
+
+    @property
+    def icon(self) -> Optional[str]:
+        """Return icon based on signal strength."""
+        if self._attr_native_value is None:
+            return "mdi:wifi-off"
+        
+        # Signal strength typically ranges from -100 dBm (weak) to -30 dBm (strong)
+        try:
+            signal = float(self._attr_native_value) if isinstance(self._attr_native_value, (int, float)) else None
+            if signal is None:
+                return "mdi:wifi-off"
+                
+            if signal >= -50:
+                return "mdi:wifi"
+            elif signal >= -60:
+                return "mdi:wifi-strength-3"
+            elif signal >= -70:
+                return "mdi:wifi-strength-2"
+            elif signal >= -80:
+                return "mdi:wifi-strength-1"
+            else:
+                return "mdi:wifi-strength-outline"
+        except (ValueError, TypeError):
+            return "mdi:wifi-off"

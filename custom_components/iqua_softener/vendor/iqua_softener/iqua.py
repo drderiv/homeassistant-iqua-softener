@@ -454,27 +454,31 @@ class IquaSoftener:
                     self._websocket_task = asyncio.current_task()
                     self._websocket_connected_at = time.time()
 
-                    async for message in websocket:
-                        if not self._websocket_running:
-                            break
-
-                        # Check if we've been connected too long (proactive reconnect)
-                        if self._websocket_connected_at:
-                            connection_duration = time.time() - self._websocket_connected_at
-                            if connection_duration >= self._websocket_max_duration:
-                                logger.info(
-                                    f"WebSocket connection duration ({connection_duration:.1f}s) "
-                                    f"exceeded max ({self._websocket_max_duration}s), reconnecting..."
-                                )
+                    try:
+                        async for message in websocket:
+                            if not self._websocket_running:
                                 break
 
-                        try:
-                            data = json.loads(message)
-                            await self._handle_websocket_message(data)
-                        except json.JSONDecodeError as e:
-                            logger.warning(f"Failed to parse WebSocket message: {e}")
-                        except Exception as e:
-                            logger.error(f"Error handling WebSocket message: {e}")
+                            # Check if we've been connected too long (proactive reconnect)
+                            if self._websocket_connected_at:
+                                connection_duration = time.time() - self._websocket_connected_at
+                                if connection_duration >= self._websocket_max_duration:
+                                    logger.info(
+                                        f"WebSocket connection duration ({connection_duration:.1f}s) "
+                                        f"exceeded max ({self._websocket_max_duration}s), reconnecting..."
+                                    )
+                                    break
+
+                            try:
+                                data = json.loads(message)
+                                await self._handle_websocket_message(data)
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Failed to parse WebSocket message: {e}")
+                            except Exception as e:
+                                logger.error(f"Error handling WebSocket message: {e}")
+                    except asyncio.CancelledError:
+                        logger.debug("WebSocket connection cancelled - shutting down gracefully")
+                        break
 
             except Exception as e:
                 logger.error(f"WebSocket connection error: {e}")

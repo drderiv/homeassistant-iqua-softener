@@ -157,10 +157,12 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self.async_show_progress_done(next_step_id="reconfigure")
                 
                 if validation_result["success"]:
-                    # Update the config entry
+                    # Update the config entry - merge user_input with existing data
+                    # This ensures all fields (including update_interval and enable_websocket) are updated
                     if config_entry is not None:
+                        updated_data = {**config_entry.data, **user_input}
                         return self.async_update_reload_and_abort(
-                            config_entry, data=user_input
+                            config_entry, data=updated_data
                         )
                     else:
                         errors["base"] = "invalid_entry"
