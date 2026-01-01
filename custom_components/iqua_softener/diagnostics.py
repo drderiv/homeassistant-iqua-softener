@@ -71,31 +71,29 @@ async def async_get_config_entry_diagnostics(
             data = coordinator.data
             device_state = {
                 "state": data.state.value if hasattr(data, "state") else "unknown",
-                "serial_number": data.serial_number if hasattr(data, "serial_number") else None,
                 "model": data.model if hasattr(data, "model") else None,
-                "firmware": data.firmware if hasattr(data, "firmware") else None,
-                "salt_level_percent": data.salt_level if hasattr(data, "salt_level") else None,
-                "water_usage_today": data.water_usage_today if hasattr(data, "water_usage_today") else None,
+                "salt_level_percent": data.salt_level_percent if hasattr(data, "salt_level_percent") else None,
+                "water_usage_today": data.today_use if hasattr(data, "today_use") else None,
                 "water_usage_daily_average": (
-                    data.water_usage_daily_average 
-                    if hasattr(data, "water_usage_daily_average") 
+                    data.average_daily_use 
+                    if hasattr(data, "average_daily_use") 
                     else None
                 ),
-                "available_water": data.available_water if hasattr(data, "available_water") else None,
-                "water_current_flow": data.water_current_flow if hasattr(data, "water_current_flow") else None,
-                "water_shutoff_valve": (
-                    data.water_shutoff_valve if hasattr(data, "water_shutoff_valve") else None
+                "total_water_available": data.total_water_available if hasattr(data, "total_water_available") else None,
+                "water_current_flow": data.current_water_flow if hasattr(data, "current_water_flow") else None,
+                "water_shutoff_valve_state": (
+                    data.water_shutoff_valve_state if hasattr(data, "water_shutoff_valve_state") else None
                 ),
-                "last_regeneration": (
-                    data.last_regeneration.isoformat() 
-                    if hasattr(data, "last_regeneration") and data.last_regeneration 
+                "days_since_last_regeneration": (
+                    data.days_since_last_regeneration if hasattr(data, "days_since_last_regeneration") else None
+                ),
+                "out_of_salt_estimated_days": (
+                    data.out_of_salt_estimated_days 
+                    if hasattr(data, "out_of_salt_estimated_days") 
                     else None
                 ),
-                "out_of_salt_estimated_day": (
-                    data.out_of_salt_estimated_day.isoformat() 
-                    if hasattr(data, "out_of_salt_estimated_day") and data.out_of_salt_estimated_day 
-                    else None
-                ),
+                "timestamp": data.timestamp.isoformat() if hasattr(data, "timestamp") and data.timestamp else None,
+                "device_date_time": data.device_date_time.isoformat() if hasattr(data, "device_date_time") and data.device_date_time else None,
             }
         except Exception as err:
             _LOGGER.error("Error collecting device state for diagnostics: %s", err)
