@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Optional, cast
 import asyncio
 
 from homeassistant.core import callback
@@ -69,6 +69,8 @@ async def _check_water_shutoff_valve_available(coordinator: IquaSoftenerCoordina
 class IquaSoftenerWaterShutoffValveSwitch(SwitchEntity, CoordinatorEntity):
     """Representation of the Iqua Softener water shutoff valve switch."""
 
+    coordinator: IquaSoftenerCoordinator  # Type hint override for proper attribute access
+
     def __init__(
         self,
         coordinator: IquaSoftenerCoordinator,
@@ -84,15 +86,17 @@ class IquaSoftenerWaterShutoffValveSwitch(SwitchEntity, CoordinatorEntity):
         self._optimistic_until = None
 
         # Get initial state
-        self.update_state(self.coordinator.data)
+        if self.coordinator.data is not None:
+            self.update_state(cast(IquaSoftenerData, self.coordinator.data))
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self.update_state(self.coordinator.data)
+        if self.coordinator.data is not None:
+            self.update_state(cast(IquaSoftenerData, self.coordinator.data))
         self.async_write_ha_state()
 
-    def update_state(self, data: IquaSoftenerData) -> None:
+    def update_state(self, data: Optional[IquaSoftenerData]) -> None:
         """Update the switch state based on coordinator data."""
         # If we're in optimistic mode and haven't reached the timeout, keep optimistic state
         if self._optimistic_state is not None and self._optimistic_until is not None:
