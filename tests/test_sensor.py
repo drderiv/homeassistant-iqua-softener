@@ -221,7 +221,7 @@ class TestSensorSetup:
             # Verify sensors were added
             assert async_add_entities.called
             call_args = async_add_entities.call_args[0][0]
-            assert len(call_args) == 11  # 10 base sensors (including WiFi signal strength) + 1 valve sensor
+            assert len(call_args) == 12  # 11 base sensors (including WiFi signal strength and water hardness) + 1 valve sensor
 
     async def test_check_water_shutoff_valve_available(self, hass, mock_iqua_softener):
         """Test checking water shutoff valve availability."""

@@ -72,6 +72,9 @@
       },
       "wifi_signal_strength": {
         "name": "WiFi Signal Strength"
+      },
+      "water_hardness": {
+        "name": "Water Hardness"
       }
     },
     "switch": {

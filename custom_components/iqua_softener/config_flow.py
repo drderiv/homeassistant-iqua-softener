@@ -185,10 +185,6 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD, default=current_data.get(CONF_PASSWORD, "")): str,
                 vol.Optional(CONF_DEVICE_SERIAL_NUMBER, default=current_data.get(CONF_DEVICE_SERIAL_NUMBER, "")): str,
                 vol.Optional(CONF_PRODUCT_SERIAL_NUMBER, default=current_data.get(CONF_PRODUCT_SERIAL_NUMBER, "")): str,
-                vol.Optional(CONF_UPDATE_INTERVAL, default=current_data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=60)
-                ),
-                vol.Optional(CONF_ENABLE_WEBSOCKET, default=current_data.get(CONF_ENABLE_WEBSOCKET, DEFAULT_ENABLE_WEBSOCKET)): bool,
             }
         )
 

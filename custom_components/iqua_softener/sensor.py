@@ -168,6 +168,16 @@ async def async_setup_entry(
                     icon="mdi:wifi",
                 ),
             ),
+            (
+                IquaSoftenerWaterHardnessSensor,
+                SensorEntityDescription(
+                    key="WATER_HARDNESS",
+                    name="Water hardness",
+                    state_class=SensorStateClass.MEASUREMENT,
+                    native_unit_of_measurement="gr/gal",
+                    icon="mdi:water-check",
+                ),
+            ),
         )
     ]
     
@@ -757,3 +767,13 @@ class IquaSoftenerWiFiSignalStrengthSensor(IquaSoftenerSensor):
                 return "mdi:wifi-strength-outline"
         except (ValueError, TypeError):
             return "mdi:wifi-off"
+
+
+class IquaSoftenerWaterHardnessSensor(IquaSoftenerSensor):
+    def update(self, data: IquaSoftenerData):
+        try:
+            self._attr_native_value = data.hardness_grains
+        except Exception as err:
+            _LOGGER.error("Error updating water hardness sensor: %s", err)
+            if not hasattr(self, '_attr_native_value'):
+                self._attr_native_value = None
