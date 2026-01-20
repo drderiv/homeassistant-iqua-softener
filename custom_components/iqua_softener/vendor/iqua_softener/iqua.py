@@ -104,8 +104,11 @@ class IquaSoftener:
         self._realtime_data: Dict[str, Any] = {}
         self._websocket_running = False
         self._websocket_lock = threading.Lock()
+        self._websocket_lifecycle_lock = threading.Lock()
         self._websocket_connected_at: Optional[float] = None
         self._websocket_max_duration = 170  # Reconnect after 170 seconds (before 3 min timeout)
+        self._websocket_backoff = 30  # Initial backoff time in seconds
+        self._websocket_max_backoff = 1800  # Maximum backoff time (30 minutes)
 
         # External real-time data (for Home Assistant integration)
         self._external_realtime_data = external_realtime_data
@@ -436,28 +439,31 @@ class IquaSoftener:
             )
             return
 
-        if self._websocket_running:
-            logger.info("WebSocket already running")
-            return
+        with self._websocket_lifecycle_lock:
+            if self._websocket_running:
+                logger.info("WebSocket already running")
+                return
 
-        self._websocket_running = True
-        self._websocket_thread = threading.Thread(
-            target=self._run_websocket_thread, daemon=True
-        )
-        self._websocket_thread.start()
+            self._websocket_running = True
+            self._websocket_backoff = 30  # Reset backoff on start
+            self._websocket_thread = threading.Thread(
+                target=self._run_websocket_thread, daemon=True
+            )
+            self._websocket_thread.start()
 
     def stop_websocket(self):
         """Stop WebSocket connection."""
-        if not self._websocket_running:
-            return
+        with self._websocket_lifecycle_lock:
+            if not self._websocket_running:
+                return
 
-        self._websocket_running = False
+            self._websocket_running = False
 
-        if self._websocket_loop and self._websocket_task:
-            self._websocket_loop.call_soon_threadsafe(self._websocket_task.cancel)
+            if self._websocket_loop and self._websocket_task:
+                self._websocket_loop.call_soon_threadsafe(self._websocket_task.cancel)
 
-        if self._websocket_thread:
-            self._websocket_thread.join(timeout=5)
+            if self._websocket_thread:
+                self._websocket_thread.join(timeout=5)
 
     def get_realtime_property(self, property_name: str) -> Optional[Any]:
         """Get a real-time property value from WebSocket data."""
@@ -516,15 +522,21 @@ class IquaSoftener:
                 # Get WebSocket URI
                 ws_uri = await self._get_websocket_uri()
                 if not ws_uri:
-                    await asyncio.sleep(30)
+                    logger.warning(f"Failed to get WebSocket URI, backing off for {self._websocket_backoff} seconds")
+                    await asyncio.sleep(self._websocket_backoff)
+                    self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
                     continue
+
+                # Reset backoff on successful URI retrieval
+                self._websocket_backoff = 30
 
                 full_uri = f"wss://api.myiquaapp.com{ws_uri}"
                 logger.info(f"Connecting to WebSocket: {full_uri}")
 
                 if websockets is None:
                     logger.error("WebSocket library not available")
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(self._websocket_backoff)
+                    self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
                     continue
 
                 async with websockets.connect(full_uri) as websocket:
@@ -562,7 +574,9 @@ class IquaSoftener:
                 logger.error(f"WebSocket connection error: {e}")
                 self._websocket_connected_at = None
                 if self._websocket_running:
-                    await asyncio.sleep(10)  # Wait before reconnecting
+                    logger.warning(f"Backing off for {self._websocket_backoff} seconds due to connection error")
+                    await asyncio.sleep(self._websocket_backoff)
+                    self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
 
     async def _get_websocket_uri(self) -> Optional[str]:
         """Get WebSocket URI from the API."""
