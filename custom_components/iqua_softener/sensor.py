@@ -20,6 +20,7 @@ from .vendor.iqua_softener import (
 )
 
 from homeassistant import config_entries, core
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -80,107 +81,111 @@ async def async_setup_entry(
         return
 
     # Define all sensors except water shutoff valve state (which is conditional)
-    base_sensors: list[IquaSoftenerSensor] = [
-        clz(coordinator, device_serial_number, entity_description)
-        for clz, entity_description in (
-            (
-                IquaSoftenerStateSensor,
-                SensorEntityDescription(key="State", name="State"),
+    base_sensors: list[IquaSoftenerSensor] = []
+    
+    # Add regular sensors with entity descriptions
+    for clz, entity_description in (
+        (
+            IquaSoftenerStateSensor,
+            SensorEntityDescription(key="State", name="State"),
+        ),
+        (
+            IquaSoftenerDeviceDateTimeSensor,
+            SensorEntityDescription(
+                key="DATE_TIME",
+                name="Date/time",
+                icon="mdi:clock",
             ),
-            (
-                IquaSoftenerDeviceDateTimeSensor,
-                SensorEntityDescription(
-                    key="DATE_TIME",
-                    name="Date/time",
-                    icon="mdi:clock",
-                ),
+        ),
+        (
+            IquaSoftenerLastRegenerationSensor,
+            SensorEntityDescription(
+                key="LAST_REGENERATION",
+                name="Last regeneration",
+                device_class=SensorDeviceClass.TIMESTAMP,
             ),
-            (
-                IquaSoftenerLastRegenerationSensor,
-                SensorEntityDescription(
-                    key="LAST_REGENERATION",
-                    name="Last regeneration",
-                    device_class=SensorDeviceClass.TIMESTAMP,
-                ),
+        ),
+        (
+            IquaSoftenerOutOfSaltEstimatedDaySensor,
+            SensorEntityDescription(
+                key="OUT_OF_SALT_ESTIMATED_DAY",
+                name="Out of salt estimated day",
+                device_class=SensorDeviceClass.TIMESTAMP,
             ),
-            (
-                IquaSoftenerOutOfSaltEstimatedDaySensor,
-                SensorEntityDescription(
-                    key="OUT_OF_SALT_ESTIMATED_DAY",
-                    name="Out of salt estimated day",
-                    device_class=SensorDeviceClass.TIMESTAMP,
-                ),
+        ),
+        (
+            IquaSoftenerSaltLevelSensor,
+            SensorEntityDescription(
+                key="SALT_LEVEL",
+                name="Salt level",
+                state_class=SensorStateClass.MEASUREMENT,
+                native_unit_of_measurement=PERCENTAGE,
             ),
-            (
-                IquaSoftenerSaltLevelSensor,
-                SensorEntityDescription(
-                    key="SALT_LEVEL",
-                    name="Salt level",
-                    state_class=SensorStateClass.MEASUREMENT,
-                    native_unit_of_measurement=PERCENTAGE,
-                ),
+        ),
+        (
+            IquaSoftenerAvailableWaterSensor,
+            SensorEntityDescription(
+                key="AVAILABLE_WATER",
+                name="Available water",
+                state_class=SensorStateClass.TOTAL,
+                device_class=SensorDeviceClass.WATER,
+                icon="mdi:water",
             ),
-            (
-                IquaSoftenerAvailableWaterSensor,
-                SensorEntityDescription(
-                    key="AVAILABLE_WATER",
-                    name="Available water",
-                    state_class=SensorStateClass.TOTAL,
-                    device_class=SensorDeviceClass.WATER,
-                    icon="mdi:water",
-                ),
+        ),
+        (
+            IquaSoftenerWaterCurrentFlowSensor,
+            SensorEntityDescription(
+                key="WATER_CURRENT_FLOW",
+                name="Water current flow",
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:water-pump",
             ),
-            (
-                IquaSoftenerWaterCurrentFlowSensor,
-                SensorEntityDescription(
-                    key="WATER_CURRENT_FLOW",
-                    name="Water current flow",
-                    state_class=SensorStateClass.MEASUREMENT,
-                    icon="mdi:water-pump",
-                ),
+        ),
+        (
+            IquaSoftenerWaterUsageTodaySensor,
+            SensorEntityDescription(
+                key="WATER_USAGE_TODAY",
+                name="Today water usage",
+                state_class=SensorStateClass.TOTAL_INCREASING,
+                device_class=SensorDeviceClass.WATER,
+                icon="mdi:water-minus",
             ),
-            (
-                IquaSoftenerWaterUsageTodaySensor,
-                SensorEntityDescription(
-                    key="WATER_USAGE_TODAY",
-                    name="Today water usage",
-                    state_class=SensorStateClass.TOTAL_INCREASING,
-                    device_class=SensorDeviceClass.WATER,
-                    icon="mdi:water-minus",
-                ),
+        ),
+        (
+            IquaSoftenerWaterUsageDailyAverageSensor,
+            SensorEntityDescription(
+                key="WATER_USAGE_DAILY_AVERAGE",
+                name="Water usage daily average",
+                state_class=SensorStateClass.MEASUREMENT,
+                icon="mdi:water-circle",
             ),
-            (
-                IquaSoftenerWaterUsageDailyAverageSensor,
-                SensorEntityDescription(
-                    key="WATER_USAGE_DAILY_AVERAGE",
-                    name="Water usage daily average",
-                    state_class=SensorStateClass.MEASUREMENT,
-                    icon="mdi:water-circle",
-                ),
+        ),
+        (
+            IquaSoftenerWiFiSignalStrengthSensor,
+            SensorEntityDescription(
+                key="WIFI_SIGNAL_STRENGTH",
+                name="WiFi signal strength",
+                state_class=SensorStateClass.MEASUREMENT,
+                device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+                native_unit_of_measurement="dBm",
+                icon="mdi:wifi",
             ),
-            (
-                IquaSoftenerWiFiSignalStrengthSensor,
-                SensorEntityDescription(
-                    key="WIFI_SIGNAL_STRENGTH",
-                    name="WiFi signal strength",
-                    state_class=SensorStateClass.MEASUREMENT,
-                    device_class=SensorDeviceClass.SIGNAL_STRENGTH,
-                    native_unit_of_measurement="dBm",
-                    icon="mdi:wifi",
-                ),
+        ),
+        (
+            IquaSoftenerWaterHardnessSensor,
+            SensorEntityDescription(
+                key="WATER_HARDNESS",
+                name="Water hardness",
+                state_class=SensorStateClass.MEASUREMENT,
+                native_unit_of_measurement="gr/gal",
+                icon="mdi:water-check",
             ),
-            (
-                IquaSoftenerWaterHardnessSensor,
-                SensorEntityDescription(
-                    key="WATER_HARDNESS",
-                    name="Water hardness",
-                    state_class=SensorStateClass.MEASUREMENT,
-                    native_unit_of_measurement="gr/gal",
-                    icon="mdi:water-check",
-                ),
-            ),
-        )
-    ]
+        ),
+    ):
+        base_sensors.append(clz(coordinator, device_serial_number, entity_description))
+    
+    # Add WebSocket connection sensor (special case - no entity description)
+    base_sensors.append(IquaSoftenerWebSocketConnectionSensor(coordinator, device_serial_number))
     
     # Check if device has water shutoff valve and add the sensor conditionally
     has_valve = await _check_water_shutoff_valve_available(coordinator)
@@ -209,6 +214,12 @@ async def async_setup_entry(
         _LOGGER.info("Initializing sensor values immediately with current data...")
         for sensor in sensors:
             try:
+                # Skip WebSocket connection sensor as it doesn't use coordinator data
+                if isinstance(sensor, IquaSoftenerWebSocketConnectionSensor):
+                    sensor._handle_coordinator_update()
+                    sensor.async_write_ha_state()
+                    continue
+                
                 # Cast coordinator data to the expected type
                 coordinator_data = coordinator.data
                 if isinstance(coordinator_data, dict):
@@ -219,7 +230,12 @@ async def async_setup_entry(
                 sensor.update(coordinator_data)
                 sensor.async_write_ha_state()
             except Exception as err:
-                _LOGGER.error("Error initializing sensor %s: %s", sensor.entity_description.name, err)
+                sensor_name = getattr(sensor, 'entity_description', None)
+                if sensor_name:
+                    sensor_name = sensor_name.name
+                else:
+                    sensor_name = getattr(sensor, '_attr_name', 'Unknown')
+                _LOGGER.error("Error initializing sensor %s: %s", sensor_name, err)
         _LOGGER.info("All sensors initialized with immediate values")
     else:
         _LOGGER.warning("No data available for immediate sensor initialization")
@@ -806,6 +822,43 @@ class IquaSoftenerWiFiSignalStrengthSensor(IquaSoftenerSensor):
                 return "mdi:wifi-strength-outline"
         except (ValueError, TypeError):
             return "mdi:wifi-off"
+
+
+class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntity):
+    """Binary sensor for WebSocket connection status."""
+    
+    coordinator: IquaSoftenerCoordinator  # Type hint override for proper attribute access
+    
+    def __init__(self, coordinator: IquaSoftenerCoordinator, device_serial_number: str):
+        super().__init__(coordinator)
+        self._device_serial_number = device_serial_number
+        self._attr_name = "WebSocket Connection"
+        self._attr_unique_id = f"{device_serial_number}_websocket_connection".lower()
+        self._attr_device_class = "connectivity"
+        self._attr_icon = "mdi:lan-connect"
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        """Return device information."""
+        return {
+            "identifiers": {(DOMAIN, self._device_serial_number)},
+            "name": f"Iqua Softener {self._device_serial_number}",
+            "manufacturer": "Iqua",
+            "model": "Water Softener",
+        }
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Update the sensor state when coordinator updates."""
+        try:
+            # Check WebSocket connection status directly from the iqua_softener instance
+            is_connected = self.coordinator._iqua_softener.websocket_connected
+            self._attr_is_on = is_connected
+            self._attr_native_value = "Connected" if is_connected else "Disconnected"
+        except Exception as err:
+            _LOGGER.error("Error updating WebSocket connection sensor: %s", err)
+            self._attr_is_on = False
+            self._attr_native_value = "Unknown"
 
 
 class IquaSoftenerWaterHardnessSensor(IquaSoftenerSensor):

@@ -107,7 +107,7 @@ class IquaSoftener:
         self._websocket_lifecycle_lock = threading.Lock()
         self._websocket_connected_at: Optional[float] = None
         self._websocket_max_duration = 170  # Reconnect after 170 seconds (before 3 min timeout)
-        self._websocket_backoff = 30  # Initial backoff time in seconds
+        self._websocket_backoff = 60  # Initial backoff time in seconds
         self._websocket_max_backoff = 1800  # Maximum backoff time (30 minutes)
 
         # External real-time data (for Home Assistant integration)
@@ -123,6 +123,11 @@ class IquaSoftener:
     @property
     def product_serial_number(self) -> Optional[str]:
         return self._product_serial_number
+    
+    @property
+    def websocket_connected(self) -> bool:
+        """Return True if WebSocket is currently connected."""
+        return self._websocket_connected_at is not None
     
     def set_websocket_data_update_callback(self, callback: Optional[Callable[[str], None]]) -> None:
         """Register a callback function to be called when WebSocket data updates.
@@ -445,7 +450,7 @@ class IquaSoftener:
                 return
 
             self._websocket_running = True
-            self._websocket_backoff = 30  # Reset backoff on start
+            self._websocket_backoff = 60  # Reset backoff on start
             self._websocket_thread = threading.Thread(
                 target=self._run_websocket_thread, daemon=True
             )
@@ -527,8 +532,8 @@ class IquaSoftener:
                     self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
                     continue
 
-                # Reset backoff on successful URI retrieval
-                self._websocket_backoff = 30
+                # Reset backoff on successful URI retrieval, but not below current level
+                self._websocket_backoff = max(60, self._websocket_backoff // 2)
 
                 full_uri = f"wss://api.myiquaapp.com{ws_uri}"
                 logger.info(f"Connecting to WebSocket: {full_uri}")
