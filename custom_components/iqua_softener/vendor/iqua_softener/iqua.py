@@ -527,6 +527,8 @@ class IquaSoftener:
                 # Get WebSocket URI
                 ws_uri = await self._get_websocket_uri()
                 if not ws_uri:
+                    # Ensure we're marked as disconnected when we can't get the URI
+                    self._websocket_connected_at = None
                     logger.warning(f"Failed to get WebSocket URI, backing off for {self._websocket_backoff} seconds")
                     await asyncio.sleep(self._websocket_backoff)
                     self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
@@ -539,6 +541,8 @@ class IquaSoftener:
                 logger.info(f"Connecting to WebSocket: {full_uri}")
 
                 if websockets is None:
+                    # Ensure we're marked as disconnected when websockets library is unavailable
+                    self._websocket_connected_at = None
                     logger.error("WebSocket library not available")
                     await asyncio.sleep(self._websocket_backoff)
                     self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
@@ -574,6 +578,11 @@ class IquaSoftener:
                     except asyncio.CancelledError:
                         logger.debug("WebSocket connection cancelled - shutting down gracefully")
                         break
+                
+                # WebSocket connection has ended (either normally or via break)
+                # Mark as disconnected before attempting to reconnect
+                self._websocket_connected_at = None
+                logger.debug("WebSocket disconnected, will attempt to reconnect")
 
             except Exception as e:
                 logger.error(f"WebSocket connection error: {e}")
