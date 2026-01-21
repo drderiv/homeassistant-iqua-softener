@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.1.0] - 2026-01-01
 
 ### Added
+- **iQua2 API**: Added support for iQua2 API
+  - Added support for choosing legacy iqua or new iqua2 api in configuration
+  - Fall back to legacy API for those who upgrade
 - **Device Settings Configuration**: New select platform for configurable device settings
   - Added support for 6 device settings: Salt Type, Inlet Water Hardness, Regeneration Time, Efficiency Mode, Max Days Between Recharges, and 97% Feature
   - Each setting is exposed as a Home Assistant select entity with dynamically populated options
@@ -31,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `IquaSoftenerWebSocketConnectionSensor` with connectivity device class
   - Real-time state updates via callback mechanism (no polling delay)
   - Shows "Connected" when WebSocket is active, "Disconnected" during reconnection or errors
+
+
 ### Fixed
 - **Configuration Flow Data Persistence**: Fixed options not persisting correctly
   - Implemented dict merge pattern in `async_step_reconfigure()` to preserve all configuration fields

@@ -12,8 +12,11 @@ from .const import (
     CONF_PRODUCT_SERIAL_NUMBER,
     CONF_UPDATE_INTERVAL,
     CONF_ENABLE_WEBSOCKET,
+    CONF_API_TYPE,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_ENABLE_WEBSOCKET,
+    DEFAULT_API_TYPE,
+    API_URLS,
 )
 from .sensor import IquaSoftenerCoordinator
 
@@ -50,7 +53,14 @@ async def async_setup_entry(
     device_sn = hass_data.get(CONF_DEVICE_SERIAL_NUMBER)
     product_sn = hass_data.get(CONF_PRODUCT_SERIAL_NUMBER)
     
-    _LOGGER.info("Creating IquaSoftener with device_sn=%s, product_sn=%s", device_sn, product_sn)
+    # Get selected API type and corresponding URL
+    # Backward compatibility: If api_type is not in config (existing installations),
+    # default to legacy iQua API to maintain compatibility with existing setups
+    api_type = hass_data.get(CONF_API_TYPE, DEFAULT_API_TYPE)
+    api_url = API_URLS.get(api_type, API_URLS[DEFAULT_API_TYPE])
+    
+    _LOGGER.info("Creating IquaSoftener with device_sn=%s, product_sn=%s, api_type=%s, api_url=%s", 
+                 device_sn, product_sn, api_type, api_url)
     
     # Create coordinator (authentication already validated in config flow)
     coordinator = IquaSoftenerCoordinator(
@@ -60,6 +70,7 @@ async def async_setup_entry(
             hass_data[CONF_PASSWORD],
             device_serial_number=device_sn,
             product_serial_number=product_sn,
+            api_base_url=api_url,
             enable_websocket=enable_websocket,  # Let the library handle WebSocket
         ),
         update_interval_seconds,

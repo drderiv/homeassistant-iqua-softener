@@ -13,14 +13,20 @@ from .const import (
     CONF_PRODUCT_SERIAL_NUMBER,
     CONF_UPDATE_INTERVAL,
     CONF_ENABLE_WEBSOCKET,
+    CONF_API_TYPE,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_ENABLE_WEBSOCKET,
+    DEFAULT_API_TYPE,
+    API_TYPE_IQUA,
+    API_TYPE_IQUA2,
+    API_URLS,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 DATA_SCHEMA_USER = vol.Schema(
     {
+        vol.Required(CONF_API_TYPE, default=DEFAULT_API_TYPE): vol.In([API_TYPE_IQUA, API_TYPE_IQUA2]),
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
         vol.Optional(CONF_DEVICE_SERIAL_NUMBER): str,
@@ -88,7 +94,11 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             device_sn = user_input.get(CONF_DEVICE_SERIAL_NUMBER)
             product_sn = user_input.get(CONF_PRODUCT_SERIAL_NUMBER)
             
-            _LOGGER.info("Validating credentials and device access for user: %s", username)
+            # Get selected API type and corresponding URL
+            api_type = user_input.get(CONF_API_TYPE, DEFAULT_API_TYPE)
+            api_url = API_URLS.get(api_type, API_URLS[DEFAULT_API_TYPE])
+            
+            _LOGGER.info("Validating credentials and device access for user: %s using %s API", username, api_type)
             
             # Create a test IquaSoftener instance
             test_iqua = IquaSoftener(
@@ -96,6 +106,7 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 password=password,
                 device_serial_number=device_sn,
                 product_serial_number=product_sn,
+                api_base_url=api_url,
                 enable_websocket=False,  # Don't start WebSocket during validation
             )
             
@@ -181,6 +192,7 @@ class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         current_data = config_entry.data
         default_schema = vol.Schema(
             {
+                vol.Required(CONF_API_TYPE, default=current_data.get(CONF_API_TYPE, DEFAULT_API_TYPE)): vol.In([API_TYPE_IQUA, API_TYPE_IQUA2]),
                 vol.Required(CONF_USERNAME, default=current_data.get(CONF_USERNAME, "")): str,
                 vol.Required(CONF_PASSWORD, default=current_data.get(CONF_PASSWORD, "")): str,
                 vol.Optional(CONF_DEVICE_SERIAL_NUMBER, default=current_data.get(CONF_DEVICE_SERIAL_NUMBER, "")): str,

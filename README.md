@@ -179,11 +179,36 @@ The vendored library will be removed once the upstream changes are merged and pu
 
 ## Configuration
 To add an iQua water softener to Home assistant, go to Settings and click "+ ADD INTEGRATION" button. From list select "iQua Softener" and click it, in displayed window you must enter:
+- **API Type** - select which API to use:
+  - **iQua** (default) - for legacy Ecowater devices and existing user accounts
+  - **iQua2** - for newer Ecowater devices and new user accounts created after the migration
 - Username - username for iQua application
 - Password - password for iQua application
 - Serial number - device serial number, you can find it in iQua app device information tab and field called "DSN#" (this field is case sensitive!)
 - Update Interval (minutes) - how often to poll the iQua servers for updated data (default: 5 minutes, range: 1-60 minutes)
 - Enable Real-time Updates - enable WebSocket connection for real-time data updates (default: enabled)
+
+### API Type Selection
+
+The integration supports both the legacy **iQua API** and the newer **iQua2 API**. Both APIs are functionally identical with the same endpoints, data structure, and authentication methods - they only differ in their user and device registrations:
+
+- **iQua API** (`api.myiquaapp.com`):
+  - For existing Ecowater devices
+  - For accounts created before the iQua2 migration
+  - Default selection for backward compatibility
+  
+- **iQua2 API** (`api.iqua2.com`):
+  - For newer Ecowater devices  
+  - For accounts created after the iQua2 migration
+  - Same functionality as iQua API, just a different user/device database
+
+**Important Notes:**
+- Choose the API that matches where your account and device are registered
+- If you're unsure, try the default iQua API first - if authentication fails, switch to iQua2
+- Existing installations will automatically continue using the iQua API when upgraded
+- You can switch between APIs at any time using the Reconfigure option
+
+The API selector was implemented because both APIs are architecturally identical - they use the same authentication mechanisms, return the same data structures, and support the same WebSocket connections. The only difference is which user accounts and device registrations they contain.
 
 ### Configuration Options
 
@@ -206,6 +231,7 @@ After initial setup, you can modify settings by:
 - Verify your iQua app credentials are correct
 - Ensure your device serial number (DSN#) is entered exactly as shown in the iQua app
 - Check that your iQua account has access to the water softener
+- **Try switching API type** - if you're using iQua but your account is on iQua2 (or vice versa), authentication will fail
 
 **No real-time updates:**
 - Check if "Enable Real-time Updates" is enabled in integration options

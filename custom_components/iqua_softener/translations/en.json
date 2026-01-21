@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "data": {
+          "api_type": "API Type",
           "username": "Username",
           "password": "Password",
           "device_sn": "Device Serial Number (optional)",
           "product_sn": "Product Serial Number (optional)",
           "update_interval": "Update Interval (minutes)",
           "enable_websocket": "Enable Real-time Updates"
+        },
+        "data_description": {
+          "api_type": "Select which API to use: iQua for legacy devices or iQua2 for newer devices"
         },
         "description": "Enter your iQua credentials and either Device Serial Number OR Product Serial Number (not both).",
         "title": "Setup"
