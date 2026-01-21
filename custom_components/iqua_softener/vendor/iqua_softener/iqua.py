@@ -115,6 +115,9 @@ class IquaSoftener:
         
         # Callback for WebSocket data updates (for Home Assistant integration)
         self._on_websocket_data_update: Optional[Callable[[str], None]] = None
+        
+        # Callback for WebSocket connection state changes (for Home Assistant integration)
+        self._on_websocket_state_change: Optional[Callable[[bool], None]] = None
 
     @property
     def device_serial_number(self) -> Optional[str]:
@@ -136,6 +139,14 @@ class IquaSoftener:
             callback: Function that takes property_name (str) as parameter, or None to unregister
         """
         self._on_websocket_data_update = callback
+    
+    def set_websocket_state_change_callback(self, callback: Optional[Callable[[bool], None]]) -> None:
+        """Register a callback function to be called when WebSocket connection state changes.
+        
+        Args:
+            callback: Function that takes is_connected (bool) as parameter, or None to unregister
+        """
+        self._on_websocket_state_change = callback
 
     def get_data(self) -> IquaSoftenerData:
         device_id = self._get_device_id()
@@ -552,6 +563,13 @@ class IquaSoftener:
                     logger.info("WebSocket connected successfully")
                     self._websocket_task = asyncio.current_task()
                     self._websocket_connected_at = time.time()
+                    
+                    # Notify connection state change callback
+                    if self._on_websocket_state_change:
+                        try:
+                            self._on_websocket_state_change(True)
+                        except Exception as e:
+                            logger.error(f"Error calling WebSocket state change callback: {e}")
 
                     try:
                         async for message in websocket:
@@ -583,6 +601,13 @@ class IquaSoftener:
                 # Mark as disconnected before attempting to reconnect
                 self._websocket_connected_at = None
                 logger.debug("WebSocket disconnected, will attempt to reconnect")
+                
+                # Notify connection state change callback
+                if self._on_websocket_state_change:
+                    try:
+                        self._on_websocket_state_change(False)
+                    except Exception as e:
+                        logger.error(f"Error calling WebSocket state change callback: {e}")
 
             except asyncio.CancelledError:
                 # Handle cancellation during sleep or other async operations
@@ -591,6 +616,14 @@ class IquaSoftener:
             except Exception as e:
                 logger.error(f"WebSocket connection error: {e}")
                 self._websocket_connected_at = None
+                
+                # Notify connection state change callback on error
+                if self._on_websocket_state_change:
+                    try:
+                        self._on_websocket_state_change(False)
+                    except Exception as callback_err:
+                        logger.error(f"Error calling WebSocket state change callback: {callback_err}")
+                
                 if self._websocket_running:
                     logger.warning(f"Backing off for {self._websocket_backoff} seconds due to connection error")
                     try:

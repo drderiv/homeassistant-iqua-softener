@@ -836,6 +836,32 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
         self._attr_unique_id = f"{device_serial_number}_websocket_connection".lower()
         self._attr_device_class = "connectivity"
         self._attr_icon = "mdi:lan-connect"
+        
+        # Register callback for WebSocket state changes
+        def on_state_change(is_connected: bool):
+            """Handle WebSocket connection state changes."""
+            try:
+                _LOGGER.debug("WebSocket state changed to: %s", "Connected" if is_connected else "Disconnected")
+                self._attr_is_on = is_connected
+                self._attr_native_value = "Connected" if is_connected else "Disconnected"
+                # Schedule state write on Home Assistant event loop
+                if self.hass:
+                    asyncio.run_coroutine_threadsafe(
+                        self._async_write_ha_state_safe(),
+                        self.hass.loop
+                    )
+            except Exception as err:
+                _LOGGER.error("Error in WebSocket state change callback: %s", err)
+        
+        coordinator._iqua_softener.set_websocket_state_change_callback(on_state_change)
+    
+    async def _async_write_ha_state_safe(self):
+        """Safely write HA state, checking if entity is added."""
+        try:
+            if hasattr(self, 'hass') and hasattr(self, 'entity_id'):
+                self.async_write_ha_state()
+        except Exception as err:
+            _LOGGER.debug("Could not write HA state (entity may not be fully initialized): %s", err)
 
     @property
     def device_info(self) -> dict[str, Any]:
