@@ -584,12 +584,20 @@ class IquaSoftener:
                 self._websocket_connected_at = None
                 logger.debug("WebSocket disconnected, will attempt to reconnect")
 
+            except asyncio.CancelledError:
+                # Handle cancellation during sleep or other async operations
+                logger.debug("WebSocket client cancelled - shutting down gracefully")
+                break
             except Exception as e:
                 logger.error(f"WebSocket connection error: {e}")
                 self._websocket_connected_at = None
                 if self._websocket_running:
                     logger.warning(f"Backing off for {self._websocket_backoff} seconds due to connection error")
-                    await asyncio.sleep(self._websocket_backoff)
+                    try:
+                        await asyncio.sleep(self._websocket_backoff)
+                    except asyncio.CancelledError:
+                        logger.debug("WebSocket backoff sleep cancelled - shutting down gracefully")
+                        break
                     self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
 
     async def _get_websocket_uri(self) -> Optional[str]:
