@@ -27,7 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Coordinator now triggers refresh when WebSocket data arrives
   - Added `async_start_websocket()` and `async_stop_websocket()` methods to coordinator
   - WebSocket connection managed properly during setup and unload lifecycle
-
+- **WebSocket Connection Sensor**: New binary sensor displaying real-time WebSocket connection status
+  - Added `IquaSoftenerWebSocketConnectionSensor` with connectivity device class
+  - Real-time state updates via callback mechanism (no polling delay)
+  - Shows "Connected" when WebSocket is active, "Disconnected" during reconnection or errors
 ### Fixed
 - **Configuration Flow Data Persistence**: Fixed options not persisting correctly
   - Implemented dict merge pattern in `async_step_reconfigure()` to preserve all configuration fields

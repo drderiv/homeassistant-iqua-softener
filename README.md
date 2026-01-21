@@ -35,9 +35,10 @@ The units displayed are set in the application settings.
 
 ## Real-Time Data Updates
 
-The integration now supports real-time data updates via WebSocket connection for select sensors:
+The integration supports real-time data updates via WebSocket connection for select sensors:
 
 - **Water Current Flow**: Updates in real-time as water flow changes
+- **WebSocket Connection**: Binary sensor showing real-time connection status
 - **Other sensors**: Continue to use the configured polling interval for updates
 
 This provides the best of both worlds:
@@ -45,6 +46,25 @@ This provides the best of both worlds:
 - **Efficient polling** for less time-sensitive data like salt levels and regeneration status
 
 The WebSocket connection is automatically managed by Home Assistant and will reconnect if the connection is lost.
+
+### WebSocket Behavior and Optimization
+
+**Important Note about Water Flow Data**: The iQua API has specific behavior regarding real-time flow data:
+
+- **Flow Data Timeout**: `current_water_flow_gpm` is only transmitted during the **first 3 minutes** of a WebSocket connection
+- **Automatic Reconnection**: To ensure continuous flow monitoring, the integration automatically reconnects every **170 seconds** (2 minutes 50 seconds)
+- **Connection Stability**: WebSocket connections remain active after 3 minutes, but they stop sending flow updates
+- **Proactive Reconnection**: The 170-second interval keeps the connection fresh and ensures uninterrupted flow data
+
+**API Rate Limiting**: The iQua API implements rate limiting on certain endpoints:
+
+- **Rate-Limited Endpoint**: `/devices/{device_id}/live` (used to obtain WebSocket URIs)
+- **URI Caching**: The integration caches WebSocket URIs for 4 minutes to reduce API calls
+- **Cache Benefits**: Reduces API calls to the `/live` endpoint by approximately 50% (~10 calls/hour vs ~20 calls/hour)
+- **Stale URI Fallback**: If the API returns a rate limit error (429), the integration will attempt to use a previously cached URI
+- **Exponential Backoff**: On repeated failures, the integration implements exponential backoff (60s to 30 minutes) to prevent API exhaustion
+
+These optimizations ensure reliable real-time water flow monitoring while respecting API rate limits and maintaining stable connections.
 
 ## Water Shutoff Valve Control
 

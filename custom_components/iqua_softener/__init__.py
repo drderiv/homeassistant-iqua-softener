@@ -86,10 +86,10 @@ async def async_setup_entry(
     hass_data["coordinator"] = coordinator
     hass.data[DOMAIN][entry.entry_id] = hass_data
 
-    # Start the WebSocket connection for real-time data (if enabled)
+    # WebSocket will be started automatically by coordinator after first successful data fetch
+    # This prevents duplicate WebSocket connections and ensures proper initialization order
     if enable_websocket:
-        _LOGGER.info("WebSocket is enabled, starting library's WebSocket connection...")
-        await coordinator.async_start_websocket()
+        _LOGGER.info("WebSocket is enabled - will start automatically after first data fetch")
     else:
         _LOGGER.info("WebSocket is disabled in configuration")
 

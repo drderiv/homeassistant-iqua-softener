@@ -98,6 +98,8 @@ class IquaSoftener:
         # WebSocket support
         self._enable_websocket = enable_websocket and websockets is not None
         self._websocket_uri: Optional[str] = None
+        self._websocket_uri_cached_at: Optional[float] = None
+        self._websocket_uri_cache_duration = 240  # Cache URI for 4 minutes (safely under 5-minute timeout)
         self._websocket_task: Optional[asyncio.Task] = None
         self._websocket_thread: Optional[threading.Thread] = None
         self._websocket_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -474,6 +476,10 @@ class IquaSoftener:
                 return
 
             self._websocket_running = False
+            
+            # Clear WebSocket URI cache when stopping to get fresh URI on next start
+            self._websocket_uri = None
+            self._websocket_uri_cached_at = None
 
             if self._websocket_loop and self._websocket_task:
                 self._websocket_loop.call_soon_threadsafe(self._websocket_task.cancel)
@@ -634,14 +640,42 @@ class IquaSoftener:
                     self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
 
     async def _get_websocket_uri(self) -> Optional[str]:
-        """Get WebSocket URI from the API."""
+        """Get WebSocket URI from the API with caching to reduce rate limit issues.
+        
+        Caches the URI for 4 minutes (safely under the 5-minute timeout) to reduce
+        API calls. With 170-second reconnect interval, this saves ~1 API call per cycle.
+        """
         try:
+            # Check if we have a cached URI that's still valid
+            if self._websocket_uri and self._websocket_uri_cached_at:
+                cache_age = time.time() - self._websocket_uri_cached_at
+                if cache_age < self._websocket_uri_cache_duration:
+                    logger.debug(
+                        f"Using cached WebSocket URI (age: {cache_age:.1f}s / {self._websocket_uri_cache_duration}s)"
+                    )
+                    return self._websocket_uri
+                else:
+                    logger.debug(f"Cached WebSocket URI expired (age: {cache_age:.1f}s), fetching new one")
+            
+            # Fetch new URI from API
             device_id = self._get_device_id()
             response = self._request("GET", f"/devices/{device_id}/live")
             data = response.json()
-            return data.get("websocket_uri")
+            ws_uri = data.get("websocket_uri")
+            
+            # Cache the URI
+            if ws_uri:
+                self._websocket_uri = ws_uri
+                self._websocket_uri_cached_at = time.time()
+                logger.debug(f"Cached new WebSocket URI for {self._websocket_uri_cache_duration}s")
+            
+            return ws_uri
         except Exception as e:
             logger.error(f"Failed to get WebSocket URI: {e}")
+            # Don't clear cache on error - try to use stale URI if available
+            if self._websocket_uri:
+                logger.warning("Using stale cached WebSocket URI due to API error")
+                return self._websocket_uri
             return None
 
     async def _handle_websocket_message(self, data: Dict[str, Any]):

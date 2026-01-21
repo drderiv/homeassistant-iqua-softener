@@ -290,6 +290,19 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         
         # Backoff strategy tracking
         self._failure_count = 0
+        
+        # Register WebSocket data update callback once during initialization
+        # This callback syncs coordinator data when WebSocket properties update
+        def on_websocket_update(property_name: str):
+            """Callback when WebSocket data updates - sync coordinator data."""
+            _LOGGER.debug("WebSocket property updated: %s - syncing coordinator data", property_name)
+            # Schedule async update on the event loop from this thread
+            asyncio.run_coroutine_threadsafe(
+                self._async_update_data_from_websocket(),
+                self.hass.loop
+            )
+        
+        self._iqua_softener.set_websocket_data_update_callback(on_websocket_update)
 
         _LOGGER.info(
             "IquaSoftenerCoordinator initialized with %d second update interval (%.1f minutes), WebSocket: %s",
@@ -326,23 +339,15 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         if not self._enable_websocket:
             _LOGGER.info("WebSocket disabled, skipping connection")
             return
+        
+        # Check if WebSocket is already running to prevent duplicate connections
+        if self._iqua_softener.websocket_connected or self._iqua_softener._websocket_running:
+            _LOGGER.debug("WebSocket already running, skipping start")
+            return
 
         try:
             _LOGGER.info("Starting WebSocket using library's built-in implementation...")
-            
-            # Register callback for WebSocket data updates
-            # Update coordinator data with current state without making API calls
-            def on_websocket_update(property_name: str):
-                """Callback when WebSocket data updates - sync coordinator data."""
-                _LOGGER.debug("WebSocket property updated: %s - syncing coordinator data", property_name)
-                # Schedule async update on the event loop from this thread
-                asyncio.run_coroutine_threadsafe(
-                    self._async_update_data_from_websocket(),
-                    self.hass.loop
-                )
-            
-            self._iqua_softener.set_websocket_data_update_callback(on_websocket_update)
-            
+            # Callback is already registered in __init__, just start the connection
             await self.hass.async_add_executor_job(self._iqua_softener.start_websocket)
             _LOGGER.info("WebSocket started successfully using library")
         except Exception as err:
