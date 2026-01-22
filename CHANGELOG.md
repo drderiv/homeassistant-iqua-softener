@@ -222,7 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 5. **Update Automations**: Review and update any automations using the old entity names
 
 ### New Installation
-1. Install via HACS custom repository: `https://github.com/jmacul2/homeassistant-iqua-softener`
+1. Install via HACS custom repository: `https://github.com/mutilator/homeassistant-iqua-softener`
 2. Restart Home Assistant
 3. Add integration via Settings → Devices & Services → Add Integration
 4. Search for "iQua Softener" and follow the configuration wizard

@@ -11,8 +11,9 @@ The `iqua_softener` library is vendored here temporarily until the upstream chan
 - Home Assistant specific optimizations
 
 ### Original Source
-- Repository: https://github.com/arturzx/iqua-softener (fork by jmacul2)
+- Repository: https://github.com/arturzx/iqua-softener
 - Original: https://github.com/arturzx/iqua-softener
+- Fork by jmacul2: https://github.com/jmacul2/iqua-softener
 
 ### Dependencies
 The vendored library requires:
