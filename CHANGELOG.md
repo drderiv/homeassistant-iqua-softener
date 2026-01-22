@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sensor Coverage**: Extended sensor suite with WiFi and water hardness monitoring
 - **Total Sensor Count**: Now provides 12+ sensors covering device state, usage, salt level, flow, timing, WiFi, and hardness
 
+### Removed
+- **Date/Time Sensor**: Removed date/time entity, it doesn't provide useful information to the user.
+
 ## [2.0.3] - 2025-11-09
 
 ### Added
