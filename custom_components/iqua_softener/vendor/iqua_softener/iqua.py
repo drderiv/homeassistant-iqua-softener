@@ -112,6 +112,14 @@ class IquaSoftener:
         self._websocket_backoff = 60  # Initial backoff time in seconds
         self._websocket_max_backoff = 1800  # Maximum backoff time (30 minutes)
 
+        # Device detail caching to avoid 429 rate limit errors
+        self._device_detail_cache: Optional[dict] = None
+        self._device_detail_cached_at: Optional[float] = None
+        self._device_detail_cache_duration = 120  # Cache device detail for 120 seconds
+        self._device_detail_backoff = 60  # Initial backoff time in seconds
+        self._device_detail_max_backoff = 1800  # Maximum backoff time (30 minutes)
+        self._device_detail_next_retry_at: Optional[float] = None  # When to retry after rate limit
+
         # External real-time data (for Home Assistant integration)
         self._external_realtime_data = external_realtime_data
         
@@ -480,6 +488,12 @@ class IquaSoftener:
             # Clear WebSocket URI cache when stopping to get fresh URI on next start
             self._websocket_uri = None
             self._websocket_uri_cached_at = None
+            
+            # Clear device detail cache and reset backoff when stopping
+            self._device_detail_cache = None
+            self._device_detail_cached_at = None
+            self._device_detail_backoff = 60
+            self._device_detail_next_retry_at = None
 
             if self._websocket_loop and self._websocket_task:
                 self._websocket_loop.call_soon_threadsafe(self._websocket_task.cancel)
@@ -904,7 +918,100 @@ class IquaSoftener:
         return r
 
     def _get_device_detail(self, device_id: str) -> dict:
-        """Get detailed device information."""
-        r = self._request("GET", f"/devices/{device_id}/detail-or-summary")
-        data = r.json()
-        return data.get("device", {})
+        """Get detailed device information with caching and backoff to avoid rate limits.
+        
+        The /detail-or-summary endpoint is rate-limited by the API.
+        This method:
+        - Caches responses for 120 seconds to reduce API calls
+        - Implements exponential backoff on 429 rate limit errors
+        - Returns stale cache during backoff period
+        """
+        current_time = time.time()
+        
+        # Check if we're in backoff period (rate limited)
+        if self._device_detail_next_retry_at and current_time < self._device_detail_next_retry_at:
+            if self._device_detail_cache is not None:
+                time_until_retry = self._device_detail_next_retry_at - current_time
+                logger.debug(
+                    "In backoff period, using cached device detail (retry in %.1f seconds)",
+                    time_until_retry
+                )
+                return self._device_detail_cache
+            else:
+                # No cache available during backoff - wait is over, allow retry
+                logger.warning("Backoff period active but no cache available, allowing retry")
+                self._device_detail_next_retry_at = None
+        
+        # Return cached data if available and still fresh
+        if (
+            self._device_detail_cache is not None
+            and self._device_detail_cached_at is not None
+            and (current_time - self._device_detail_cached_at) < self._device_detail_cache_duration
+        ):
+            logger.debug(
+                "Using cached device detail (age: %.1f seconds)",
+                current_time - self._device_detail_cached_at
+            )
+            return self._device_detail_cache
+        
+        # Attempt to fetch fresh data
+        try:
+            r = self._request("GET", f"/devices/{device_id}/detail-or-summary")
+            data = r.json()
+            device_data = data.get("device", {})
+            
+            # Success - cache the result and reset backoff
+            self._device_detail_cache = device_data
+            self._device_detail_cached_at = current_time
+            self._device_detail_backoff = 60  # Reset backoff on success
+            self._device_detail_next_retry_at = None
+            logger.debug("Fetched and cached fresh device detail data")
+            
+            return device_data
+            
+        except requests.exceptions.HTTPError as e:
+            # Check if it's a 429 rate limit error
+            if e.response and e.response.status_code == 429:
+                # Calculate next retry time with exponential backoff
+                self._device_detail_next_retry_at = current_time + self._device_detail_backoff
+                logger.warning(
+                    "Rate limited (429) on device detail endpoint, backing off for %d seconds",
+                    self._device_detail_backoff
+                )
+                
+                # Double the backoff for next time (exponential backoff)
+                self._device_detail_backoff = min(
+                    self._device_detail_backoff * 2,
+                    self._device_detail_max_backoff
+                )
+                
+                # Return stale cache if available
+                if self._device_detail_cache is not None:
+                    cache_age = current_time - self._device_detail_cached_at if self._device_detail_cached_at else 0
+                    logger.info(
+                        "Using stale cached device detail during backoff (age: %.1f seconds)",
+                        cache_age
+                    )
+                    return self._device_detail_cache
+                else:
+                    logger.error("Rate limited with no cache available")
+                    raise
+            else:
+                # Other HTTP errors - return stale cache if available
+                if self._device_detail_cache is not None:
+                    logger.warning(
+                        "HTTP error fetching device detail (will use stale cache): %s",
+                        e
+                    )
+                    return self._device_detail_cache
+                raise
+                
+        except Exception as e:
+            # Any other errors - return stale cache if available
+            if self._device_detail_cache is not None:
+                logger.warning(
+                    "Error fetching device detail (will use stale cache): %s",
+                    e
+                )
+                return self._device_detail_cache
+            raise
