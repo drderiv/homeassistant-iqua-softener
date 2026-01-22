@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **iQua2 API**: Added support for iQua2 API
   - Added support for choosing legacy iqua or new iqua2 api in configuration
   - Fall back to legacy API for those who upgrade
+- **Regeneration Status Sensor**: New text sensor displaying current regeneration status
+  - Added `IquaSoftenerRegenerationStatusSensor` reading from enriched API data
+  - Displays formatted status: None, Regenerating, Scheduled, Unknown, Disabled, Suspended, Error, Wsov Disabled
+  - Updates via periodic API polling (enriched_data.water_treatment.regeneration.regeneration_status)
+- **Regeneration Time Remaining Sensor**: New duration sensor showing time remaining for current regeneration cycle
+  - Added `IquaSoftenerRegenerationTimeRemainingSensor` with real-time WebSocket updates
+  - Displays time in seconds using SensorDeviceClass.DURATION
+  - Updates in real-time via WebSocket property `regen_time_rem_secs`
+  - Shows 0 when device is not regenerating
 - **Device Settings Configuration**: New select platform for configurable device settings
   - Added support for 6 device settings: Salt Type, Inlet Water Hardness, Regeneration Time, Efficiency Mode, Max Days Between Recharges, and 97% Feature
   - Each setting is exposed as a Home Assistant select entity with dynamically populated options
@@ -47,8 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Enhanced
 - **Component Architecture**: New select platform registration for device settings
 - **Real-time Updates**: Improved responsiveness with WebSocket callback integration
-- **Sensor Coverage**: Extended sensor suite with WiFi and water hardness monitoring
-- **Total Sensor Count**: Now provides 12+ sensors covering device state, usage, salt level, flow, timing, WiFi, and hardness
+- **Sensor Coverage**: Extended sensor suite with regeneration monitoring, WiFi signal, and water hardness
+- **Total Sensor Count**: Now provides 14 sensors covering device state, regeneration status and timing, usage, salt level, flow, WiFi, and hardness
 
 ### Removed
 - **Date/Time Sensor**: Removed date/time entity, it doesn't provide useful information to the user.

@@ -1,7 +1,7 @@
 # iQua app supported water softeners integration for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub release](https://img.shields.io/github/release/jmacul2/homeassistant-iqua-softener.svg)](https://github.com/jmacul2/homeassistant-iqua-softener/releases)
+[![GitHub release](https://img.shields.io/github/release/mutilator/homeassistant-iqua-softener.svg)](https://github.com/mutilator/homeassistant-iqua-softener/releases)
 
 `iqua_softener` is a _custom component_ for [Home Assistant](https://www.home-assistant.io/). The integration allows you to pull data for you iQua app supported water softener from Ecowater company server.
 
@@ -9,13 +9,15 @@
 
 - **🔄 Real-time Updates**: WebSocket support for instant water flow monitoring
 - **💧 Water Control**: Remote water shutoff valve control for emergency situations
-- **📊 Comprehensive Monitoring**: 9 sensors covering all aspects of your water softener
+- **📊 Comprehensive Monitoring**: 10 sensors covering all aspects of your water softener
 - **⚙️ Configurable**: Adjustable polling intervals and real-time update settings
 - **🏠 Native Integration**: Full Home Assistant integration with device grouping
 - **🔧 Automation Ready**: Perfect for leak detection and water usage automations
 
-It will create nine sensors with both periodic updates and real-time WebSocket data (default polling interval: 5 minutes, with real-time flow updates):
+It will create eleven sensors with both periodic updates and real-time WebSocket data (default polling interval: 5 minutes, with real-time flow updates):
 - State - whether the softener is connected to Ecowater server
+- Regeneration Status - current regeneration status (None, Regenerating, Scheduled, etc.)
+- Regeneration Time Remaining - time remaining for current regeneration cycle in seconds
 - Last regeneration - the day of last regeneration
 - Out of salt estimated day - the day on which the end of salt is predicted
 - Salt level - salt level load in percentage
@@ -29,6 +31,8 @@ It will also create one switch:
 - Water shutoff valve - allows you to remotely open/close the water shutoff valve
 
 The units displayed are set in the application settings.
+
+![Homeassistant controls dialog](controls.png)
 
 ![Homeassistant sensor dialog](sensor.png)
 

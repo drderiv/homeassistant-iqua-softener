@@ -74,6 +74,12 @@ def mock_iqua_data():
         out_of_salt_estimated_days=30,
         hardness_grains=10,
         water_shutoff_valve_state=1,
+        enriched_data={
+            "regeneration": {
+                "regeneration_status": "none",
+                "regen_time_rem_secs": 0
+            }
+        },
     )
 
 

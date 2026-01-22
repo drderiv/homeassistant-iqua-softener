@@ -91,6 +91,24 @@ async def async_setup_entry(
         ),
         # Date/time sensor removed - not useful for users
         (
+            IquaSoftenerRegenerationStatusSensor,
+            SensorEntityDescription(
+                key="REGENERATION_STATUS",
+                name="Regeneration Status",
+                icon="mdi:refresh-circle",
+            ),
+        ),
+        (
+            IquaSoftenerRegenerationTimeRemainingSensor,
+            SensorEntityDescription(
+                key="REGENERATION_TIME_REMAINING",
+                name="Regeneration Time Remaining",
+                device_class=SensorDeviceClass.DURATION,
+                native_unit_of_measurement="s",
+                icon="mdi:timer-sand",
+            ),
+        ),
+        (
             IquaSoftenerLastRegenerationSensor,
             SensorEntityDescription(
                 key="LAST_REGENERATION",
@@ -588,6 +606,58 @@ class IquaSoftenerLastRegenerationSensor(IquaSoftenerSensor):
             _LOGGER.error("Error updating last regeneration sensor: %s", err)
             if not hasattr(self, '_attr_native_value'):
                 self._attr_native_value = None
+
+
+class IquaSoftenerRegenerationStatusSensor(IquaSoftenerSensor):
+    """Sensor for regeneration status from enriched data."""
+    
+    def update(self, data: IquaSoftenerData):
+        try:
+            # Get regeneration status from enriched data
+            # Note: enriched_data is already the water_treatment object from the API
+            regeneration_status = "unknown"
+            
+            if hasattr(data, 'enriched_data') and data.enriched_data:
+                regeneration = data.enriched_data.get('regeneration', {})
+                regeneration_status = regeneration.get('regeneration_status', 'unknown')
+            
+            # Capitalize for display (e.g., "none" -> "None", "regenerating" -> "Regenerating")
+            self._attr_native_value = regeneration_status.replace('_', ' ').title()
+            
+        except Exception as err:
+            _LOGGER.error("Error updating regeneration status sensor: %s", err)
+            if not hasattr(self, '_attr_native_value'):
+                self._attr_native_value = "Unknown"
+
+
+class IquaSoftenerRegenerationTimeRemainingSensor(IquaSoftenerSensor):
+    """Sensor for regeneration time remaining in seconds."""
+    
+    def update(self, data: IquaSoftenerData):
+        try:
+            # Try to get real-time value from WebSocket first
+            realtime_value = self.coordinator._iqua_softener.get_realtime_property(
+                "regen_time_rem_secs"
+            )
+            
+            if realtime_value is not None:
+                self._attr_native_value = int(realtime_value)
+            else:
+                # Fall back to enriched_data from periodic API calls
+                # Note: enriched_data is already the water_treatment object from the API
+                regen_time_rem = None
+                
+                if hasattr(data, 'enriched_data') and data.enriched_data:
+                    regeneration = data.enriched_data.get('regeneration', {})
+                    regen_time_rem = regeneration.get('regen_time_rem_secs')
+                
+                # Set the value in seconds (or 0 if not available/not regenerating)
+                self._attr_native_value = int(regen_time_rem) if regen_time_rem is not None else 0
+            
+        except Exception as err:
+            _LOGGER.error("Error updating regeneration time remaining sensor: %s", err)
+            if not hasattr(self, '_attr_native_value'):
+                self._attr_native_value = 0
 
 
 class IquaSoftenerOutOfSaltEstimatedDaySensor(IquaSoftenerSensor):
