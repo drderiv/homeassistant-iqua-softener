@@ -131,7 +131,7 @@ action:
    - Click on "Integrations"
    - Click the three dots menu (⋮) in the top right
    - Select "Custom repositories"
-   - Add repository URL: `https://github.com/jmacul2/homeassistant-iqua-softener`
+   - Add repository URL: `https://github.com/mutilator/homeassistant-iqua-softener`
    - Select category: "Integration"
    - Click "Add"
 
