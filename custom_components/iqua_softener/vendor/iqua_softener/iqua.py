@@ -592,10 +592,7 @@ class IquaSoftener:
                             logger.error(f"Error calling WebSocket state change callback: {e}")
 
                     try:
-                        async for message in websocket:
-                            if not self._websocket_running:
-                                break
-
+                        while self._websocket_running:
                             # Check if we've been connected too long (proactive reconnect)
                             if self._websocket_connected_at:
                                 connection_duration = time.time() - self._websocket_connected_at
@@ -605,17 +602,39 @@ class IquaSoftener:
                                         f"exceeded max ({self._websocket_max_duration}s), reconnecting..."
                                     )
                                     break
-
+                            
                             try:
-                                data = json.loads(message)
-                                await self._handle_websocket_message(data)
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"Failed to parse WebSocket message: {e}")
-                            except Exception as e:
-                                logger.error(f"Error handling WebSocket message: {e}")
+                                # Use asyncio.wait_for to timeout if no message arrives
+                                # This ensures we check connection duration even without messages
+                                message = await asyncio.wait_for(
+                                    websocket.recv(),
+                                    timeout=30.0  # Check connection status every 30 seconds
+                                )
+                                
+                                try:
+                                    data = json.loads(message)
+                                    await self._handle_websocket_message(data)
+                                except json.JSONDecodeError as e:
+                                    logger.warning(f"Failed to parse WebSocket message: {e}")
+                                except Exception as e:
+                                    logger.error(f"Error handling WebSocket message: {e}")
+                                    
+                            except asyncio.TimeoutError:
+                                # No message received within timeout - this is normal
+                                # Just loop back to check connection duration
+                                continue
+                            except websockets.exceptions.ConnectionClosed:
+                                logger.info("WebSocket connection closed by server")
+                                break
                     except asyncio.CancelledError:
                         logger.debug("WebSocket connection cancelled - shutting down gracefully")
                         break
+                    finally:
+                        # Log when we exit the message receive loop
+                        if self._websocket_running:
+                            logger.warning("WebSocket message receive loop exited unexpectedly while running=True")
+                        else:
+                            logger.debug("WebSocket message receive loop exited normally (running=False)")
                 
                 # WebSocket connection has ended (either normally or via break)
                 # Mark as disconnected before attempting to reconnect
@@ -628,6 +647,11 @@ class IquaSoftener:
                         self._on_websocket_state_change(False)
                     except Exception as e:
                         logger.error(f"Error calling WebSocket state change callback: {e}")
+                
+                # Small delay before reconnecting to avoid tight loops
+                if self._websocket_running:
+                    logger.debug("Waiting 1 second before reconnect attempt")
+                    await asyncio.sleep(1)
 
             except asyncio.CancelledError:
                 # Handle cancellation during sleep or other async operations
