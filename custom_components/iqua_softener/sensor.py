@@ -89,14 +89,7 @@ async def async_setup_entry(
             IquaSoftenerStateSensor,
             SensorEntityDescription(key="State", name="State"),
         ),
-        (
-            IquaSoftenerDeviceDateTimeSensor,
-            SensorEntityDescription(
-                key="DATE_TIME",
-                name="Date/time",
-                icon="mdi:clock",
-            ),
-        ),
+        # Date/time sensor removed - not useful for users
         (
             IquaSoftenerLastRegenerationSensor,
             SensorEntityDescription(
@@ -579,22 +572,8 @@ class IquaSoftenerStateSensor(IquaSoftenerSensor):
                 self._attr_native_value = "Unknown"
 
 
-class IquaSoftenerDeviceDateTimeSensor(IquaSoftenerSensor):
-    def update(self, data: IquaSoftenerData):
-        try:
-            # Convert UTC device time to Home Assistant's local timezone
-            device_time_local = dt_util.as_local(data.device_date_time)
-            # Remove microseconds for cleaner display
-            device_time_clean = device_time_local.replace(microsecond=0)
-            self._attr_native_value = device_time_clean
-            
-            # Debug logging for timezone conversion
-            _LOGGER.debug("Device time conversion: %s (UTC) -> %s (Local)", 
-                         data.device_date_time, device_time_clean)
-        except Exception as err:
-            _LOGGER.error("Error updating date/time sensor: %s", err)
-            if not hasattr(self, '_attr_native_value'):
-                self._attr_native_value = None
+# IquaSoftenerDeviceDateTimeSensor class removed - sensor no longer exposed
+# The underlying data.device_date_time field is still available for debugging
 
 
 class IquaSoftenerLastRegenerationSensor(IquaSoftenerSensor):

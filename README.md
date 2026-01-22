@@ -9,14 +9,13 @@
 
 - **🔄 Real-time Updates**: WebSocket support for instant water flow monitoring
 - **💧 Water Control**: Remote water shutoff valve control for emergency situations
-- **📊 Comprehensive Monitoring**: 10 sensors covering all aspects of your water softener
+- **📊 Comprehensive Monitoring**: 9 sensors covering all aspects of your water softener
 - **⚙️ Configurable**: Adjustable polling intervals and real-time update settings
 - **🏠 Native Integration**: Full Home Assistant integration with device grouping
 - **🔧 Automation Ready**: Perfect for leak detection and water usage automations
 
-It will create ten sensors with both periodic updates and real-time WebSocket data (default polling interval: 5 minutes, with real-time flow updates):
+It will create nine sensors with both periodic updates and real-time WebSocket data (default polling interval: 5 minutes, with real-time flow updates):
 - State - whether the softener is connected to Ecowater server
-- Date/time - date and time set on water softener
 - Last regeneration - the day of last regeneration
 - Out of salt estimated day - the day on which the end of salt is predicted
 - Salt level - salt level load in percentage

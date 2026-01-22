@@ -9,7 +9,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from custom_components.iqua_softener.sensor import (
     IquaSoftenerCoordinator,
     IquaSoftenerStateSensor,
-    IquaSoftenerDeviceDateTimeSensor,
+    # IquaSoftenerDeviceDateTimeSensor removed - sensor no longer exposed
     IquaSoftenerLastRegenerationSensor,
     IquaSoftenerOutOfSaltEstimatedDaySensor,
     IquaSoftenerSaltLevelSensor,
@@ -96,16 +96,8 @@ class TestSensorEntities:
         assert sensor._attr_native_value == "NORMAL"
         assert sensor.unique_id == "device123_state"
 
-    async def test_datetime_sensor(self, hass, mock_iqua_data):
-        """Test the device date/time sensor."""
-        coordinator = MagicMock()
-        coordinator.data = mock_iqua_data
-
-        sensor = IquaSoftenerDeviceDateTimeSensor(coordinator, "DEVICE123")
-        sensor.update(mock_iqua_data)
-
-        assert isinstance(sensor._attr_native_value, datetime)
-        assert sensor.unique_id == "device123_date_time"
+    # Date/time sensor test removed - sensor no longer exposed
+    # The class still exists but is not instantiated
 
     async def test_state_sensor(self, hass, init_integration):
         """Test the state sensor through the state machine."""
@@ -114,13 +106,6 @@ class TestSensorEntities:
         state = hass.states.get("sensor.state")
         assert state is not None
         assert state.state == "Online"
-
-    async def test_datetime_sensor(self, hass, init_integration):
-        """Test the device datetime sensor through the state machine."""
-        await hass.async_block_till_done()
-        
-        state = hass.states.get("sensor.date_time")
-        assert state is not None
 
     async def test_last_regeneration_sensor(self, hass, init_integration):
         """Test the last regeneration sensor through the state machine."""
@@ -221,7 +206,7 @@ class TestSensorSetup:
             # Verify sensors were added
             assert async_add_entities.called
             call_args = async_add_entities.call_args[0][0]
-            assert len(call_args) == 13  # 12 base sensors (including WiFi signal strength, water hardness, and WebSocket connection) + 1 valve sensor
+            assert len(call_args) == 12  # 11 base sensors (including WiFi signal strength, water hardness, and WebSocket connection) + 1 valve sensor
 
     async def test_check_water_shutoff_valve_available(self, hass, mock_iqua_softener):
         """Test checking water shutoff valve availability."""
