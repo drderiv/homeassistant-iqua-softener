@@ -12,6 +12,5 @@
     "platforms": ["sensor", "switch", "select", "button"]
   },
   "loggers": ["iqua"],
-  "version": "2.1.1",
-  "documentation_url": "https://github.com/mutilator/homeassistant-iqua-softener/blob/master/README.md"
+  "version": "2.1.1"
 }
