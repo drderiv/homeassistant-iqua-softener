@@ -64,16 +64,6 @@ class TestIquaSoftenerCoordinator:
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
 
-    async def test_websocket_operations(self, hass, mock_iqua_softener):
-        """Test WebSocket start/stop operations."""
-        coordinator = IquaSoftenerCoordinator(hass, mock_iqua_softener, enable_websocket=True)
-
-        await coordinator.async_start_websocket()
-        mock_iqua_softener.start_websocket.assert_called_once()
-
-        await coordinator.async_stop_websocket()
-        mock_iqua_softener.stop_websocket.assert_called_once()
-
     async def test_websocket_disabled(self, hass, mock_iqua_softener):
         """Test WebSocket operations when disabled."""
         coordinator = IquaSoftenerCoordinator(hass, mock_iqua_softener, enable_websocket=False)

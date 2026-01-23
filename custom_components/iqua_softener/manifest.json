@@ -9,9 +9,9 @@
   "config_flow": true,
   "iot_class": "cloud_polling",
   "homeassistant": {
-    "platforms": ["sensor", "switch", "select"]
+    "platforms": ["sensor", "switch", "select", "button"]
   },
   "loggers": ["iqua"],
-  "version": "2.1.0",
+  "version": "2.1.1",
   "documentation_url": "https://github.com/mutilator/homeassistant-iqua-softener/blob/master/README.md"
 }

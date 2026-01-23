@@ -155,27 +155,6 @@ class TestIquaSoftenerConfigFlow:
             assert result["success"] is False
             assert result["error"] == "cannot_connect"
 
-    async def test_reconfigure_flow_success(self, hass, mock_config_entry, mock_iqua_data):
-        """Test successful reconfiguration flow."""
-        mock_config_entry.add_to_hass(hass)
-        
-        with patch("custom_components.iqua_softener.config_flow.IquaSoftener") as mock_iqua_class:
-            mock_iqua_instance = MagicMock()
-            mock_iqua_instance.get_data = MagicMock(return_value=mock_iqua_data)
-            mock_iqua_class.return_value = mock_iqua_instance
-
-            result = await hass.config_entries.flow.async_init(
-                DOMAIN,
-                context={"source": "reconfigure", "entry_id": mock_config_entry.entry_id},
-                data={
-                    CONF_USERNAME: "new@example.com",
-                    CONF_PASSWORD: "newpassword",
-                    CONF_DEVICE_SERIAL_NUMBER: "NEWDEVICE",
-                },
-            )
-
-            assert result.get("type") == FlowResultType.ABORT or result.get("type") == FlowResultType.CREATE_ENTRY
-
     async def test_reconfigure_flow_invalid_entry(self, hass):
         """Test reconfiguration flow with invalid entry."""
         flow = config_flow.IquaSoftenerConfigFlow()

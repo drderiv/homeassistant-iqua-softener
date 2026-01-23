@@ -117,5 +117,16 @@ async def init_integration(
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    
+    return mock_config_entry
+
+
+@pytest.fixture
+def mock_coordinator(mock_iqua_softener, mock_iqua_data):
+    """Create a mock coordinator for testing."""
+    coordinator = MagicMock()
+    coordinator._iqua_softener = mock_iqua_softener
+    coordinator.data = mock_iqua_data
+    coordinator.last_update_success = True
+    coordinator.async_request_refresh = AsyncMock()
+    return coordinator
     return mock_config_entry

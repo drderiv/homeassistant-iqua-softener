@@ -535,7 +535,11 @@ class IquaSoftener:
             data = response.json()
             ws_uri = data.get("websocket_uri")
             if ws_uri:
-                return f"wss://api.myiquaapp.com{ws_uri}"
+                # Convert HTTP(S) API base URL to WebSocket URL
+                ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
+                # Remove /v1 or any path suffix from base URL for WebSocket connection
+                ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
+                return f"{ws_host}{ws_uri}"
             return None
         except Exception as e:
             logger.error(f"Failed to get WebSocket URI: {e}")
@@ -562,15 +566,24 @@ class IquaSoftener:
                 if not ws_uri:
                     # Ensure we're marked as disconnected when we can't get the URI
                     self._websocket_connected_at = None
-                    logger.warning(f"Failed to get WebSocket URI, backing off for {self._websocket_backoff} seconds")
-                    await asyncio.sleep(self._websocket_backoff)
-                    self._websocket_backoff = min(self._websocket_backoff * 2, self._websocket_max_backoff)
+                    
+                    # Use longer backoff immediately when rate-limited (120s minimum)
+                    backoff_duration = max(120, self._websocket_backoff)
+                    logger.warning(f"Failed to get WebSocket URI (likely rate-limited), backing off for {backoff_duration} seconds")
+                    await asyncio.sleep(backoff_duration)
+                    
+                    # Increase backoff for next failure
+                    self._websocket_backoff = min(backoff_duration * 2, self._websocket_max_backoff)
                     continue
 
-                # Reset backoff on successful URI retrieval, but not below current level
-                self._websocket_backoff = max(60, self._websocket_backoff // 2)
+                # Reset backoff on successful URI retrieval
+                self._websocket_backoff = 120
 
-                full_uri = f"wss://api.myiquaapp.com{ws_uri}"
+                # Convert HTTP(S) API base URL to WebSocket URL
+                ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
+                # Remove /v1 or any path suffix from base URL for WebSocket connection
+                ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
+                full_uri = f"{ws_host}{ws_uri}"
                 logger.info(f"Connecting to WebSocket: {full_uri}")
 
                 if websockets is None:
@@ -660,8 +673,17 @@ class IquaSoftener:
                 logger.debug("WebSocket client cancelled - shutting down gracefully")
                 break
             except Exception as e:
+                error_str = str(e).lower()
                 logger.error(f"WebSocket connection error: {e}")
                 self._websocket_connected_at = None
+                
+                # If we get a 400 error, the cached URI is invalid - clear it
+                if "400" in error_str or "bad request" in error_str:
+                    logger.warning("WebSocket URI rejected with 400 - clearing cached URI")
+                    self._websocket_uri = None
+                    self._websocket_uri_cached_at = None
+                    # Use longer backoff when URI is invalid (120s minimum)
+                    self._websocket_backoff = max(120, self._websocket_backoff)
                 
                 # Notify connection state change callback on error
                 if self._on_websocket_state_change:
@@ -689,13 +711,17 @@ class IquaSoftener:
             # Check if we have a cached URI that's still valid
             if self._websocket_uri and self._websocket_uri_cached_at:
                 cache_age = time.time() - self._websocket_uri_cached_at
-                if cache_age < self._websocket_uri_cache_duration:
+                # CRITICAL: URIs always expire after 300 seconds - never use older cache
+                if cache_age < 300:
                     logger.debug(
-                        f"Using cached WebSocket URI (age: {cache_age:.1f}s / {self._websocket_uri_cache_duration}s)"
+                        f"Using cached WebSocket URI (age: {cache_age:.1f}s / 300s max)"
                     )
                     return self._websocket_uri
                 else:
-                    logger.debug(f"Cached WebSocket URI expired (age: {cache_age:.1f}s), fetching new one")
+                    logger.debug(f"Cached WebSocket URI expired (age: {cache_age:.1f}s >= 300s), fetching new one")
+                    # Clear expired cache
+                    self._websocket_uri = None
+                    self._websocket_uri_cached_at = None
             
             # Fetch new URI from API
             device_id = self._get_device_id()
@@ -703,19 +729,38 @@ class IquaSoftener:
             data = response.json()
             ws_uri = data.get("websocket_uri")
             
-            # Cache the URI
+            # Cache the URI and reset backoff on success
             if ws_uri:
                 self._websocket_uri = ws_uri
                 self._websocket_uri_cached_at = time.time()
-                logger.debug(f"Cached new WebSocket URI for {self._websocket_uri_cache_duration}s")
+                # Reset backoff on successful URI fetch
+                self._websocket_backoff = 120
+                logger.debug(f"Cached new WebSocket URI (valid for 300s)")
             
             return ws_uri
+        except requests.HTTPError as e:
+            # Clear stale cache on any error
+            self._websocket_uri = None
+            self._websocket_uri_cached_at = None
+            
+            # Check if it's a rate limit error (429)
+            if e.response is not None and e.response.status_code == 429:
+                logger.warning("Rate limited when fetching WebSocket URI - starting backoff at 120s")
+                # Set backoff to 120s immediately on rate limit
+                self._websocket_backoff = 120
+                return None
+            else:
+                logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 120s")
+                # Set backoff to 120s immediately on HTTP error
+                self._websocket_backoff = 120
+                return None
         except Exception as e:
-            logger.error(f"Failed to get WebSocket URI: {e}")
-            # Don't clear cache on error - try to use stale URI if available
-            if self._websocket_uri:
-                logger.warning("Using stale cached WebSocket URI due to API error")
-                return self._websocket_uri
+            logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 120s")
+            # Clear cache on any error
+            self._websocket_uri = None
+            self._websocket_uri_cached_at = None
+            # Set backoff to 120s immediately on any error
+            self._websocket_backoff = 120
             return None
 
     async def _handle_websocket_message(self, data: Dict[str, Any]):

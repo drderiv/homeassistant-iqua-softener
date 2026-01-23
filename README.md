@@ -9,12 +9,13 @@
 
 - **🔄 Real-time Updates**: WebSocket support for instant water flow monitoring
 - **💧 Water Control**: Remote water shutoff valve control for emergency situations
-- **📊 Comprehensive Monitoring**: 10 sensors covering all aspects of your water softener
+- **📊 Comprehensive Monitoring**: 11 sensors covering all aspects of your water softener
 - **⚙️ Configurable**: Adjustable polling intervals and real-time update settings
+- **⚡ Device Control**: Button entity for starting regeneration cycles on demand
 - **🏠 Native Integration**: Full Home Assistant integration with device grouping
 - **🔧 Automation Ready**: Perfect for leak detection and water usage automations
 
-It will create eleven sensors with both periodic updates and real-time WebSocket data (default polling interval: 5 minutes, with real-time flow updates):
+It will create eleven sensors with both periodic updates and real-time WebSocket data (default polling interval: 10 minutes, with real-time flow updates):
 - State - whether the softener is connected to Ecowater server
 - Regeneration Status - current regeneration status (None, Regenerating, Scheduled, etc.)
 - Regeneration Time Remaining - time remaining for current regeneration cycle in seconds
@@ -29,6 +30,16 @@ It will create eleven sensors with both periodic updates and real-time WebSocket
 
 It will also create one switch:
 - Water shutoff valve - allows you to remotely open/close the water shutoff valve
+
+It will also create one button:
+- Start Regeneration - triggers an immediate regeneration cycle
+
+It will also create select entities for device configuration:
+- Regeneration Time - set the time when regeneration occurs
+- Salt Type - choose between NaCl (sodium) and KCl (potassium)
+- Efficiency Mode - select Salt Efficient or Auto Adjusting mode
+- Max Days Between Recharges - set maximum days between regeneration cycles
+- Inlet Hardness - set incoming water hardness level
 
 The units displayed are set in the application settings.
 
