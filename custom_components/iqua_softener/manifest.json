@@ -3,14 +3,13 @@
   "name": "iQua Softener",
   "documentation": "https://github.com/mutilator/homeassistant-iqua-softener/",
   "issue_tracker": "https://github.com/mutilator/homeassistant-iqua-softener/issues",
+  "integration_type": "hub",
   "dependencies": [],
-  "codeowners": ["@arturzx", "@jmacul2", "@mutilator"],
+  "codeowners": ["@mutilator", "@arturzx", "@jmacul2"],
   "requirements": ["requests", "PyJWT"],
   "config_flow": true,
   "iot_class": "cloud_polling",
-  "homeassistant": {
-    "platforms": ["sensor", "switch", "select", "button"]
-  },
   "loggers": ["iqua"],
-  "version": "2.1.1"
+  "version": "2.1.1",
+  "quality_scale": "silver"
 }
