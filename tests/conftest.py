@@ -80,6 +80,20 @@ def mock_iqua_data():
                 "regen_time_rem_secs": 0
             }
         },
+        additional_properties={
+            "treated_water_avail_gals": {
+                "converted_value": 1000,
+                "converted_units": "Gallons"
+            },
+            "gallons_used_today": {
+                "converted_value": 50,
+                "converted_units": "Gallons"
+            },
+            "avg_daily_use_gals": {
+                "converted_value": 45,
+                "converted_units": "Gallons"
+            }
+        },
     )
 
 

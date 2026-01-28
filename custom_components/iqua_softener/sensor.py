@@ -20,7 +20,10 @@ from .vendor.iqua_softener import (
 )
 
 from homeassistant import config_entries, core
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorDeviceClass,
+)
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -635,6 +638,17 @@ class IquaSoftenerRegenerationTimeRemainingSensor(IquaSoftenerSensor):
     
     def update(self, data: IquaSoftenerData):
         try:
+            # Check regeneration status - if not regenerating, time remaining should be 0
+            regeneration_status = "unknown"
+            if hasattr(data, 'enriched_data') and data.enriched_data:
+                regeneration = data.enriched_data.get('regeneration', {})
+                regeneration_status = regeneration.get('regeneration_status', 'unknown')
+            
+            # If not regenerating, zero out the time remaining
+            if regeneration_status != "regenerating":
+                self._attr_native_value = 0
+                return
+            
             # Try to get real-time value from WebSocket first
             realtime_value = self.coordinator._iqua_softener.get_realtime_property(
                 "regen_time_rem_secs"
@@ -706,14 +720,14 @@ class IquaSoftenerSaltLevelSensor(IquaSoftenerSensor):
 class IquaSoftenerAvailableWaterSensor(IquaSoftenerSensor):
     def update(self, data: IquaSoftenerData):
         try:
-            self._attr_native_value = data.total_water_available / (
-                1000 if data.volume_unit == IquaSoftenerVolumeUnit.LITERS else 1
-            )
-            self._attr_native_unit_of_measurement = (
-                UnitOfVolume.CUBIC_METERS
-                if data.volume_unit == IquaSoftenerVolumeUnit.LITERS
-                else UnitOfVolume.GALLONS
-            )
+            # Use converted_value from additional_properties if available, otherwise fall back to total_water_available
+            if data.additional_properties and "treated_water_avail_gals" in data.additional_properties:
+                prop = data.additional_properties["treated_water_avail_gals"]
+                self._attr_native_value = prop.get("converted_value", data.total_water_available)
+                # Set unit based on converted_units
+                units = prop.get("converted_units", "Gallons")
+                self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
+
             # Set last reset to last regeneration in local timezone
             now_local = dt_util.now()
             last_regen = now_local - timedelta(days=data.days_since_last_regeneration)
@@ -761,15 +775,20 @@ class IquaSoftenerWaterUsageTodaySensor(IquaSoftenerSensor):
     def update(self, data: IquaSoftenerData):
         try:
             old_value = getattr(self, '_attr_native_value', None)
-            self._attr_native_value = data.today_use / (
-                1000 if data.volume_unit == IquaSoftenerVolumeUnit.LITERS else 1
-            )
-            self._attr_native_unit_of_measurement = (
-                UnitOfVolume.CUBIC_METERS
-                if data.volume_unit == IquaSoftenerVolumeUnit.LITERS
-                else UnitOfVolume.GALLONS
-            )
-            
+            # Use converted_value from additional_properties if available
+            if data.additional_properties and "gallons_used_today" in data.additional_properties:
+                prop = data.additional_properties["gallons_used_today"]
+                self._attr_native_value = prop.get("converted_value", data.today_use)
+                # Set unit based on converted_units
+                units = prop.get("converted_units", "Gallons")
+                self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
+            else:
+                self._attr_native_value = 0
+                self._attr_native_unit_of_measurement = (
+                    UnitOfVolume.LITERS
+                    if data.volume_unit == IquaSoftenerVolumeUnit.LITERS
+                    else UnitOfVolume.GALLONS
+                )
             if old_value != self._attr_native_value:
                 _LOGGER.debug("Today's water usage changed: %s → %s %s", 
                             old_value, self._attr_native_value, self._attr_native_unit_of_measurement)
@@ -782,14 +801,14 @@ class IquaSoftenerWaterUsageTodaySensor(IquaSoftenerSensor):
 class IquaSoftenerWaterUsageDailyAverageSensor(IquaSoftenerSensor):
     def update(self, data: IquaSoftenerData):
         try:
-            self._attr_native_value = data.average_daily_use / (
-                1000 if data.volume_unit == IquaSoftenerVolumeUnit.LITERS else 1
-            )
-            self._attr_native_unit_of_measurement = (
-                UnitOfVolume.CUBIC_METERS
-                if data.volume_unit == IquaSoftenerVolumeUnit.LITERS
-                else UnitOfVolume.GALLONS
-            )
+            # Use converted_value from additional_properties if available
+            if data.additional_properties and "avg_daily_use_gals" in data.additional_properties:
+                prop = data.additional_properties["avg_daily_use_gals"]
+                self._attr_native_value = prop.get("converted_value", data.average_daily_use)
+                # Set unit based on converted_units
+                units = prop.get("converted_units", "Gallons")
+                self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
+
         except Exception as err:
             _LOGGER.error("Error updating daily average water usage sensor: %s", err)
             if not hasattr(self, '_attr_native_value'):
@@ -888,7 +907,7 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
         self._device_serial_number = device_serial_number
         self._attr_name = "WebSocket Connection"
         self._attr_unique_id = f"{device_serial_number}_websocket_connection".lower()
-        self._attr_device_class = "connectivity"
+        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_icon = "mdi:lan-connect"
         
         # Register callback for WebSocket state changes

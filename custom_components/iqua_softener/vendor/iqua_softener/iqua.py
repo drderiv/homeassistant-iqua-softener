@@ -67,6 +67,7 @@ class IquaSoftenerData:
     hardness_grains: int
     water_shutoff_valve_state: int
     enriched_data: Optional[Dict[str, Any]] = None  # Full enriched_data from API for additional sensors
+    additional_properties: Optional[Dict[str, Any]] = None  # Full properties from debug API for detailed data
 
 
 class IquaSoftener:
@@ -250,6 +251,7 @@ class IquaSoftener:
             hardness_grains=int(val("hardness_grains", 0)),
             water_shutoff_valve_state=self._get_water_shutoff_valve_state(device),
             enriched_data=enriched,  # Include full enriched_data for additional sensors
+            additional_properties=props,  # Include full properties from device detail API
         )
 
     def get_flow_and_salt(self) -> dict:

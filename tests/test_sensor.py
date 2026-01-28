@@ -134,7 +134,7 @@ class TestSensorEntities:
         
         state = hass.states.get("sensor.available_water")
         assert state is not None
-        assert state.state == "1000.0"
+        assert state.state == "1000"
 
     async def test_water_flow_sensor(self, hass, init_integration):
         """Test the water current flow sensor through the state machine."""
@@ -149,7 +149,7 @@ class TestSensorEntities:
         
         state = hass.states.get("sensor.today_water_usage")
         assert state is not None
-        assert state.state == "50.0"
+        assert state.state == "50"
 
     async def test_water_usage_daily_average_sensor(self, hass, init_integration):
         """Test the daily average water usage sensor through the state machine."""
@@ -157,7 +157,7 @@ class TestSensorEntities:
         
         state = hass.states.get("sensor.water_usage_daily_average")
         assert state is not None
-        assert state.state == "45.0"
+        assert state.state == "45"
 
     async def test_valve_state_sensor(self, hass, init_integration):
         """Test the water shutoff valve state sensor through the state machine."""

@@ -5,6 +5,16 @@ All notable changes to the iQua Softener Home Assistant integration will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-01-28
+
+### Fixed
+- **Water Usage Sensors**: Fixed unit conversion for today_water_usage and daily_average_usage sensors
+  - The API incorrectly returns units for some summary keys, causing inconsistent unit display
+  - Now properly uses converted_value and converted_units from device properties for accurate unit handling
+- **Regeneration Time Remaining**: Zero out time remaining when regeneration status changes from regenerating
+  - Fixes edge case where WebSocket disconnects and doesn't receive final update of time remaining
+  - Ensures sensor accurately reflects current regeneration state even with connection issues
+
 ## [2.1.1] - 2026-01-23
 
 ### Added
