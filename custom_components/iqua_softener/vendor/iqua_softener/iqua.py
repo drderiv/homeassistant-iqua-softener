@@ -747,22 +747,22 @@ class IquaSoftener:
             
             # Check if it's a rate limit error (429)
             if e.response is not None and e.response.status_code == 429:
-                logger.warning("Rate limited when fetching WebSocket URI - starting backoff at 120s")
-                # Set backoff to 120s immediately on rate limit
-                self._websocket_backoff = 120
+                logger.warning("Rate limited when fetching WebSocket URI - starting backoff at 300s")
+                # Set backoff to 300s immediately on rate limit
+                self._websocket_backoff = 300
                 return None
             else:
-                logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 120s")
-                # Set backoff to 120s immediately on HTTP error
-                self._websocket_backoff = 120
+                logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 300s")
+                # Set backoff to 300s immediately on HTTP error
+                self._websocket_backoff = 300
                 return None
         except Exception as e:
-            logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 120s")
+            logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 300s")
             # Clear cache on any error
             self._websocket_uri = None
             self._websocket_uri_cached_at = None
-            # Set backoff to 120s immediately on any error
-            self._websocket_backoff = 120
+            # Set backoff to 300s immediately on any error
+            self._websocket_backoff = 300
             return None
 
     async def _handle_websocket_message(self, data: Dict[str, Any]):
