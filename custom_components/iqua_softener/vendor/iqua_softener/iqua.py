@@ -571,7 +571,7 @@ class IquaSoftener:
                     
                     # Use longer backoff immediately when rate-limited (120s minimum)
                     backoff_duration = max(120, self._websocket_backoff)
-                    logger.warning(f"Failed to get WebSocket URI (likely rate-limited), backing off for {backoff_duration} seconds")
+                    logger.debug(f"Failed to get WebSocket URI (likely rate-limited), backing off for {backoff_duration} seconds")
                     await asyncio.sleep(backoff_duration)
                     
                     # Increase backoff for next failure
@@ -649,7 +649,7 @@ class IquaSoftener:
                     finally:
                         # Log when we exit the message receive loop
                         if self._websocket_running:
-                            logger.warning("WebSocket message receive loop exited unexpectedly while running=True")
+                            logger.debug("WebSocket message receive loop exited unexpectedly while running=True")
                         else:
                             logger.debug("WebSocket message receive loop exited normally (running=False)")
                 
@@ -681,7 +681,7 @@ class IquaSoftener:
                 
                 # If we get a 400 error, the cached URI is invalid - clear it
                 if "400" in error_str or "bad request" in error_str:
-                    logger.warning("WebSocket URI rejected with 400 - clearing cached URI")
+                    logger.debug("WebSocket URI rejected with 400 - clearing cached URI")
                     self._websocket_uri = None
                     self._websocket_uri_cached_at = None
                     # Use longer backoff when URI is invalid (120s minimum)
@@ -695,7 +695,7 @@ class IquaSoftener:
                         logger.error(f"Error calling WebSocket state change callback: {callback_err}")
                 
                 if self._websocket_running:
-                    logger.warning(f"Backing off for {self._websocket_backoff} seconds due to connection error")
+                    logger.debug(f"Backing off for {self._websocket_backoff} seconds due to connection error")
                     try:
                         await asyncio.sleep(self._websocket_backoff)
                     except asyncio.CancelledError:
@@ -747,7 +747,7 @@ class IquaSoftener:
             
             # Check if it's a rate limit error (429)
             if e.response is not None and e.response.status_code == 429:
-                logger.warning("Rate limited when fetching WebSocket URI - starting backoff at 300s")
+                logger.debug("Rate limited when fetching WebSocket URI - starting backoff at 300s")
                 # Set backoff to 300s immediately on rate limit
                 self._websocket_backoff = 300
                 return None
@@ -1012,7 +1012,7 @@ class IquaSoftener:
                 return self._device_detail_cache
             else:
                 # No cache available during backoff - wait is over, allow retry
-                logger.warning("Backoff period active but no cache available, allowing retry")
+                logger.debug("Backoff period active but no cache available, allowing retry")
                 self._device_detail_next_retry_at = None
         
         # Return cached data if available and still fresh
@@ -1047,7 +1047,7 @@ class IquaSoftener:
             if e.response and e.response.status_code == 429:
                 # Calculate next retry time with exponential backoff
                 self._device_detail_next_retry_at = current_time + self._device_detail_backoff
-                logger.warning(
+                logger.debug(
                     "Rate limited (429) on device detail endpoint, backing off for %d seconds",
                     self._device_detail_backoff
                 )

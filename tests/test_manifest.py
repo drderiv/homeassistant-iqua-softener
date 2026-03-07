@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 
 from custom_components.iqua_softener.const import DOMAIN
-
+from homeassistant.const import UnitOfVolumeFlowRate
 
 def load_manifest():
     """Load the manifest from the JSON file."""
@@ -73,15 +73,13 @@ class TestConstants:
         assert DEFAULT_ENABLE_WEBSOCKET is True
         assert SWITCH_OPTIMISTIC_TIMEOUT == 10
 
-    def test_volume_constants(self):
-        """Test volume-related constants."""
-        from custom_components.iqua_softener.const import (
-            VOLUME_FLOW_RATE_LITERS_PER_MINUTE,
-            VOLUME_FLOW_RATE_GALLONS_PER_MINUTE,
-        )
+    def test_flow_rate_enum_import(self):
+        """Ensure the home assistant flow-rate enum is available."""
+        from homeassistant.const import UnitOfVolumeFlowRate
 
-        assert VOLUME_FLOW_RATE_LITERS_PER_MINUTE == "L/m"
-        assert VOLUME_FLOW_RATE_GALLONS_PER_MINUTE == "gal/m"
+        # Basic sanity check of enum members used by integration
+        assert UnitOfVolumeFlowRate.LITERS_PER_MINUTE
+        assert UnitOfVolumeFlowRate.GALLONS_PER_MINUTE
 
 
 class TestImportStructure:

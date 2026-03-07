@@ -27,6 +27,3 @@ API_URLS: Final = {
 
 # Switch optimistic state timeout (seconds)
 SWITCH_OPTIMISTIC_TIMEOUT: Final = 10
-
-VOLUME_FLOW_RATE_LITERS_PER_MINUTE: Final = "L/m"
-VOLUME_FLOW_RATE_GALLONS_PER_MINUTE: Final = "gal/m"

@@ -32,14 +32,13 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE
 from homeassistant.const import UnitOfVolume
+from homeassistant.const import UnitOfVolumeFlowRate
 
 from .const import (
     DOMAIN,
     CONF_DEVICE_SERIAL_NUMBER,
     CONF_PRODUCT_SERIAL_NUMBER,
     DEFAULT_UPDATE_INTERVAL,
-    VOLUME_FLOW_RATE_LITERS_PER_MINUTE,
-    VOLUME_FLOW_RATE_GALLONS_PER_MINUTE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -151,6 +150,7 @@ async def async_setup_entry(
             SensorEntityDescription(
                 key="WATER_CURRENT_FLOW",
                 name="Water current flow",
+                device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
                 state_class=SensorStateClass.MEASUREMENT,
                 icon="mdi:water-pump",
             ),
@@ -739,6 +739,11 @@ class IquaSoftenerAvailableWaterSensor(IquaSoftenerSensor):
 
 
 class IquaSoftenerWaterCurrentFlowSensor(IquaSoftenerSensor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ensure the device_class is set even if the description is mutated later
+        self._attr_device_class = SensorDeviceClass.VOLUME_FLOW_RATE
+
     def update(self, data: IquaSoftenerData):
         try:
             # Use the library's get_realtime_property method for real-time flow data
@@ -761,9 +766,9 @@ class IquaSoftenerWaterCurrentFlowSensor(IquaSoftenerSensor):
                     _LOGGER.debug("Water flow updated from API: %s", self._attr_native_value)
 
             self._attr_native_unit_of_measurement = (
-                VOLUME_FLOW_RATE_LITERS_PER_MINUTE
+                UnitOfVolumeFlowRate.LITERS_PER_MINUTE
                 if data.volume_unit == IquaSoftenerVolumeUnit.LITERS
-                else VOLUME_FLOW_RATE_GALLONS_PER_MINUTE
+                else UnitOfVolumeFlowRate.GALLONS_PER_MINUTE
             )
         except Exception as err:
             _LOGGER.error("Error updating water flow sensor: %s", err)

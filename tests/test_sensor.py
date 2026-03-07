@@ -137,11 +137,19 @@ class TestSensorEntities:
         assert state.state == "1000"
 
     async def test_water_flow_sensor(self, hass, init_integration):
-        """Test the water current flow sensor through the state machine."""
+        """Test the water current flow sensor through the state machine.
+
+        Verify the device class and unit of measurement are correct (gal/min).
+        """
         await hass.async_block_till_done()
         
         state = hass.states.get("sensor.water_current_flow")
         assert state is not None
+        # device_class should be volume flow rate
+        assert state.attributes.get("device_class") == "volume_flow_rate"
+        # unit should match the gallons per minute constant in the integration
+        from homeassistant.const import UnitOfVolumeFlowRate
+        assert state.attributes.get("unit_of_measurement") == UnitOfVolumeFlowRate.GALLONS_PER_MINUTE
 
     async def test_water_usage_today_sensor(self, hass, init_integration):
         """Test the today water usage sensor through the state machine."""
