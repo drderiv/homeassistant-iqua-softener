@@ -122,6 +122,12 @@ class IquaSoftener:
         self._device_detail_max_backoff = 1800  # Maximum backoff time (30 minutes)
         self._device_detail_next_retry_at: Optional[float] = None  # When to retry after rate limit
 
+        # Rate-limit state parsed from API response headers.
+        # Updated on every response so backoff adapts if the server policy changes.
+        self._rate_limit_remaining: Optional[int] = None
+        self._rate_limit_limit: Optional[int] = None
+        self._rate_limit_refill_interval: Optional[float] = None  # seconds per token
+
         # External real-time data (for Home Assistant integration)
         self._external_realtime_data = external_realtime_data
         
@@ -568,18 +574,19 @@ class IquaSoftener:
                 if not ws_uri:
                     # Ensure we're marked as disconnected when we can't get the URI
                     self._websocket_connected_at = None
-                    
-                    # Use longer backoff immediately when rate-limited (120s minimum)
-                    backoff_duration = max(120, self._websocket_backoff)
-                    logger.debug(f"Failed to get WebSocket URI (likely rate-limited), backing off for {backoff_duration} seconds")
+
+                    # _get_websocket_uri() already set _websocket_backoff from the
+                    # rate-limit policy; use that value directly.
+                    backoff_duration = self._websocket_backoff
+                    logger.debug(f"Failed to get WebSocket URI (likely rate-limited), backing off for {backoff_duration:.1f} seconds")
                     await asyncio.sleep(backoff_duration)
-                    
-                    # Increase backoff for next failure
+
+                    # Exponential backoff for repeated failures
                     self._websocket_backoff = min(backoff_duration * 2, self._websocket_max_backoff)
                     continue
 
-                # Reset backoff on successful URI retrieval
-                self._websocket_backoff = 120
+                # Reset backoff to one refill period on successful URI retrieval
+                self._websocket_backoff = self._rate_limit_backoff()
 
                 # Convert HTTP(S) API base URL to WebSocket URL
                 ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
@@ -684,8 +691,8 @@ class IquaSoftener:
                     logger.debug("WebSocket URI rejected with 400 - clearing cached URI")
                     self._websocket_uri = None
                     self._websocket_uri_cached_at = None
-                    # Use longer backoff when URI is invalid (120s minimum)
-                    self._websocket_backoff = max(120, self._websocket_backoff)
+                    # Use at least one full refill period when URI is invalid
+                    self._websocket_backoff = max(self._rate_limit_backoff(), self._websocket_backoff)
                 
                 # Notify connection state change callback on error
                 if self._on_websocket_state_change:
@@ -735,8 +742,8 @@ class IquaSoftener:
             if ws_uri:
                 self._websocket_uri = ws_uri
                 self._websocket_uri_cached_at = time.time()
-                # Reset backoff on successful URI fetch
-                self._websocket_backoff = 120
+                # Reset backoff to one refill period on successful URI fetch
+                self._websocket_backoff = self._rate_limit_backoff()
                 logger.debug(f"Cached new WebSocket URI (valid for 300s)")
             
             return ws_uri
@@ -747,22 +754,22 @@ class IquaSoftener:
             
             # Check if it's a rate limit error (429)
             if e.response is not None and e.response.status_code == 429:
-                logger.debug("Rate limited when fetching WebSocket URI - starting backoff at 300s")
-                # Set backoff to 300s immediately on rate limit
-                self._websocket_backoff = 300
+                backoff = self._rate_limit_backoff()
+                logger.debug("Rate limited when fetching WebSocket URI - backing off for %.1fs", backoff)
+                self._websocket_backoff = backoff
                 return None
             else:
-                logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 300s")
-                # Set backoff to 300s immediately on HTTP error
-                self._websocket_backoff = 300
+                backoff = self._rate_limit_backoff()
+                logger.error(f"Failed to get WebSocket URI: {e} - backing off for {backoff:.1f}s")
+                self._websocket_backoff = backoff
                 return None
         except Exception as e:
-            logger.error(f"Failed to get WebSocket URI: {e} - starting backoff at 300s")
+            backoff = self._rate_limit_backoff()
+            logger.error(f"Failed to get WebSocket URI: {e} - backing off for {backoff:.1f}s")
             # Clear cache on any error
             self._websocket_uri = None
             self._websocket_uri_cached_at = None
-            # Set backoff to 300s immediately on any error
-            self._websocket_backoff = 300
+            self._websocket_backoff = backoff
             return None
 
     async def _handle_websocket_message(self, data: Dict[str, Any]):
@@ -963,6 +970,74 @@ class IquaSoftener:
             except IquaSoftenerException:
                 self._login()
 
+    @staticmethod
+    def _parse_policy_header(policy: str) -> dict:
+        """Parse a ratelimit-policy header value into a dict.
+
+        Format: "<limit>;w=<window>;burst=<burst>;policy=<name>"
+        Example: "5;w=60;burst=50;policy=token_bucket"
+        Returns: {'limit': 5, 'w': 60, 'burst': 50, 'policy': 'token_bucket'}
+        """
+        result: dict = {}
+        parts = policy.split(";")
+        try:
+            result["limit"] = int(parts[0])
+        except (ValueError, IndexError):
+            pass
+        for part in parts[1:]:
+            if "=" in part:
+                k, v = part.split("=", 1)
+                try:
+                    result[k] = int(v)
+                except ValueError:
+                    result[k] = v
+        return result
+
+    def _parse_rate_limit_headers(self, response: requests.Response) -> None:
+        """Extract rate-limit headers from a response and update internal state.
+
+        Called after every API response so the integration always uses the
+        current server-side policy rather than hard-coded constants.
+        """
+        remaining = response.headers.get("ratelimit-remaining")
+        limit = response.headers.get("ratelimit-limit")
+        policy = response.headers.get("ratelimit-policy")
+
+        if remaining is not None:
+            try:
+                self._rate_limit_remaining = int(remaining)
+            except ValueError:
+                pass
+
+        if limit is not None:
+            try:
+                self._rate_limit_limit = int(limit)
+            except ValueError:
+                pass
+
+        if policy is not None:
+            parsed = self._parse_policy_header(policy)
+            window = parsed.get("w")
+            base_limit = parsed.get("limit")
+            if window and base_limit:
+                self._rate_limit_refill_interval = window / base_limit
+                logger.debug(
+                    "Rate-limit policy: %s req/%ss burst=%s → refill every %.1fs",
+                    base_limit, window, parsed.get("burst", "?"),
+                    self._rate_limit_refill_interval,
+                )
+
+    def _rate_limit_backoff(self) -> float:
+        """Return the minimum safe wait before the next API request.
+
+        Uses the token refill interval derived from the ratelimit-policy header
+        so the backoff automatically adapts when the server changes its policy.
+        Falls back to 60 s if no policy header has been seen yet.
+        """
+        if self._rate_limit_refill_interval is not None:
+            return self._rate_limit_refill_interval
+        return 60.0
+
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
         """Make an authenticated request to the API."""
         self._ensure_authenticated()
@@ -985,6 +1060,9 @@ class IquaSoftener:
             except IquaSoftenerException:
                 self._login()
                 r = self._session.request(method, url, timeout=20, **kwargs)
+
+        # Always parse rate-limit headers so backoff stays in sync with server policy.
+        self._parse_rate_limit_headers(r)
 
         if r.status_code != 200:
             r.raise_for_status()
@@ -1036,7 +1114,7 @@ class IquaSoftener:
             # Success - cache the result and reset backoff
             self._device_detail_cache = device_data
             self._device_detail_cached_at = current_time
-            self._device_detail_backoff = 60  # Reset backoff on success
+            self._device_detail_backoff = self._rate_limit_backoff()  # Reset to one refill period
             self._device_detail_next_retry_at = None
             logger.debug("Fetched and cached fresh device detail data")
             
@@ -1045,6 +1123,10 @@ class IquaSoftener:
         except requests.exceptions.HTTPError as e:
             # Check if it's a 429 rate limit error
             if e.response and e.response.status_code == 429:
+                # Seed the backoff from the current rate-limit policy on first 429,
+                # then double on each subsequent failure (exponential backoff).
+                if self._device_detail_backoff == 60:
+                    self._device_detail_backoff = self._rate_limit_backoff()
                 # Calculate next retry time with exponential backoff
                 self._device_detail_next_retry_at = current_time + self._device_detail_backoff
                 logger.debug(
