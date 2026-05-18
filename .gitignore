@@ -10,3 +10,11 @@ build/
 __pycache__
 
 venv/
+
+device_data_dumps/
+
+pyrightconfig.json
+
+.vscode/
+
+.env
