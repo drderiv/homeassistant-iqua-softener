@@ -106,5 +106,11 @@
         "name": "97% Feature"
       }
     }
+  },
+  "issues": {
+    "entity_id_migration": {
+      "title": "iQua Softener: entity IDs renamed",
+      "description": "The iQua Softener integration renamed the following entity IDs to include the device serial number:\n\n{entity_list}\n\nPlease update any automations, scripts, scenes, dashboards, and templates that reference the old entity IDs."
+    }
   }
 }

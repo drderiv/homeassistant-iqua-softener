@@ -1,7 +1,10 @@
 import logging
 
 from homeassistant import config_entries, core
+from homeassistant.components import persistent_notification
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.util import slugify
 from .vendor.iqua_softener import IquaSoftener, IquaSoftenerException
 
 from .const import (
@@ -117,6 +120,131 @@ async def options_update_listener(
     await coordinator.async_stop_websocket()
 
     await hass.config_entries.async_reload(config_entry.entry_id)
+
+
+def _notify_entity_id_migration(
+    hass: core.HomeAssistant, renamed: list[tuple[str, str]]
+) -> None:
+    """Create a persistent notification and a Repairs issue listing renamed entity IDs.
+
+    Called once after all entity-registry renames are complete so the user knows
+    which old entity IDs to search for in automations, scripts, dashboards, etc.
+    """
+    lines = "\n".join(f"- `{old}` → `{new}`" for old, new in renamed)
+
+    message = (
+        "iQua Softener entity IDs have been updated to include the device serial "
+        "number so that multiple devices can coexist.\n\n"
+        f"{lines}\n\n"
+        "Please check your automations, scripts, scenes, dashboards, and "
+        "templates for references to the old entity IDs and update them manually."
+    )
+
+    persistent_notification.async_create(
+        hass,
+        message,
+        title="iQua Softener — entity IDs renamed",
+        notification_id=f"{DOMAIN}_entity_id_migration",
+    )
+
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "entity_id_migration",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        learn_more_url=(
+            "https://github.com/mutilator/homeassistant-iqua-softener/blob/master/CHANGELOG.md"
+        ),
+        translation_key="entity_id_migration",
+        translation_placeholders={"entity_list": lines},
+    )
+
+    _LOGGER.warning(
+        "iQua Softener: %d entity ID(s) renamed. "
+        "Check automations, dashboards, and templates for old references. "
+        "See the Repairs panel or the persistent notification for the full list.",
+        len(renamed),
+    )
+
+
+async def async_migrate_entry(
+    hass: core.HomeAssistant, config_entry: config_entries.ConfigEntry
+) -> bool:
+    """Migrate old config entry to new version.
+
+    Version 1 → 2: Prefix entity IDs with the device serial number so that
+    multiple devices can coexist without entity-ID collisions.
+    Only entities still using the integration-generated default ID are renamed;
+    user-customised IDs are left untouched.
+    """
+    _LOGGER.info(
+        "Migrating iQua Softener config entry from version %s", config_entry.version
+    )
+
+    if config_entry.version < 2:
+        data = dict(config_entry.data)
+        if config_entry.options:
+            data.update(config_entry.options)
+
+        device_sn = data.get(CONF_DEVICE_SERIAL_NUMBER) or data.get(
+            CONF_PRODUCT_SERIAL_NUMBER
+        )
+        if not device_sn:
+            _LOGGER.error(
+                "Cannot migrate iQua Softener entry: no device serial number in config"
+            )
+            return False
+
+        serial_lower = device_sn.lower()
+        entity_registry = er.async_get(hass)
+        entries = er.async_entries_for_config_entry(
+            entity_registry, config_entry.entry_id
+        )
+
+        renamed: list[tuple[str, str]] = []
+
+        for entry in entries:
+            if not entry.original_name:
+                continue
+
+            # Compute what the old auto-generated entity_id should have been.
+            expected_old_id = f"{entry.domain}.{slugify(entry.original_name)}"
+
+            if entry.entity_id != expected_old_id:
+                # User has customised this entity_id – leave it alone.
+                _LOGGER.debug(
+                    "Skipping migration for customised entity %s", entry.entity_id
+                )
+                continue
+
+            # Build the new entity_id with the serial prefix.
+            old_key = entry.entity_id[len(entry.domain) + 1:]  # strip "domain."
+            new_entity_id = f"{entry.domain}.{serial_lower}_{old_key}"
+
+            if entity_registry.async_get(new_entity_id) is not None:
+                _LOGGER.warning(
+                    "Target entity_id %s already exists, skipping migration for %s",
+                    new_entity_id,
+                    entry.entity_id,
+                )
+                continue
+
+            entity_registry.async_update_entity(
+                entry.entity_id, new_entity_id=new_entity_id
+            )
+            _LOGGER.info(
+                "Migrated entity_id %s → %s", entry.entity_id, new_entity_id
+            )
+            renamed.append((entry.entity_id, new_entity_id))
+
+        if renamed:
+            _notify_entity_id_migration(hass, renamed)
+
+        hass.config_entries.async_update_entry(config_entry, version=2)
+        _LOGGER.info("iQua Softener config entry migration to version 2 complete")
+
+    return True
 
 
 async def async_unload_entry(

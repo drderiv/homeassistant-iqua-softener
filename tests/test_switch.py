@@ -19,7 +19,7 @@ class TestSwitchEntities:
 
     async def test_switch_initialization(self, hass, init_integration):
         """Test switch initialization through state machine."""
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
     async def test_switch_turn_on(self, hass, init_integration, mock_iqua_softener):
         """Test turning the switch on through service call."""
@@ -27,12 +27,12 @@ class TestSwitchEntities:
         await hass.services.async_call(
             "switch",
             "turn_on",
-            {"entity_id": "switch.water_shutoff_valve"},
+            {"entity_id": "switch.device123_water_shutoff_valve"},
             blocking=True,
         )
         
         # Verify the service was called
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
     async def test_switch_turn_off(self, hass, init_integration, mock_iqua_softener):
         """Test turning the switch off through service call."""
@@ -40,27 +40,27 @@ class TestSwitchEntities:
         await hass.services.async_call(
             "switch",
             "turn_off",
-            {"entity_id": "switch.water_shutoff_valve"},
+            {"entity_id": "switch.device123_water_shutoff_valve"},
             blocking=True,
         )
         
         # Verify the service was called
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
     async def test_switch_optimistic_timeout(self, hass, init_integration):
         """Test optimistic state timeout behavior."""
         # Verify switch exists
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
     async def test_switch_error_handling(self, hass, init_integration):
         """Test switch error handling through state machine."""
         # Verify switch exists and can handle state checks
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
     async def test_switch_coordinator_update(self, hass, init_integration):
         """Test switch updates from coordinator."""
         # Verify initial state
-        assert (state := hass.states.get("switch.water_shutoff_valve"))
+        assert (state := hass.states.get("switch.device123_water_shutoff_valve"))
 
 
 class TestSwitchSetup:

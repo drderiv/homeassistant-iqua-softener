@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
     CoordinatorEntity,
 )
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util, slugify
 
 from .vendor.iqua_softener import (
     IquaSoftener,
@@ -545,6 +545,9 @@ class IquaSoftenerSensor(SensorEntity, CoordinatorEntity, ABC):
                 f"{device_serial_number}_{entity_description.key}".lower()
             )
             self.entity_description = entity_description
+            self.entity_id = (
+                f"sensor.{device_serial_number.lower()}_{slugify(entity_description.name)}"
+            )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -912,6 +915,7 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
         self._device_serial_number = device_serial_number
         self._attr_name = "WebSocket Connection"
         self._attr_unique_id = f"{device_serial_number}_websocket_connection".lower()
+        self.entity_id = f"binary_sensor.{device_serial_number.lower()}_websocket_connection"
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_icon = "mdi:lan-connect"
         

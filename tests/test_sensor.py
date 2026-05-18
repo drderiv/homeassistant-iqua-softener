@@ -93,7 +93,7 @@ class TestSensorEntities:
         """Test the state sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.state")
+        state = hass.states.get("sensor.device123_state")
         assert state is not None
         assert state.state == "Online"
 
@@ -101,21 +101,21 @@ class TestSensorEntities:
         """Test the last regeneration sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.last_regeneration")
+        state = hass.states.get("sensor.device123_last_regeneration")
         assert state is not None
 
     async def test_out_of_salt_sensor(self, hass, init_integration):
         """Test the out of salt estimation sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.out_of_salt_estimated_day")
+        state = hass.states.get("sensor.device123_out_of_salt_estimated_day")
         assert state is not None
 
     async def test_salt_level_sensor(self, hass, init_integration):
         """Test the salt level sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.salt_level")
+        state = hass.states.get("sensor.device123_salt_level")
         assert state is not None
         assert state.state == "75"
 
@@ -124,7 +124,7 @@ class TestSensorEntities:
         await hass.async_block_till_done()
         
         # Just verify the sensor exists and has an icon attribute
-        state = hass.states.get("sensor.salt_level")
+        state = hass.states.get("sensor.device123_salt_level")
         assert state is not None
         assert state.attributes.get("icon") is not None
 
@@ -132,7 +132,7 @@ class TestSensorEntities:
         """Test the available water sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.available_water")
+        state = hass.states.get("sensor.device123_available_water")
         assert state is not None
         assert state.state == "1000"
 
@@ -143,7 +143,7 @@ class TestSensorEntities:
         """
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.water_current_flow")
+        state = hass.states.get("sensor.device123_water_current_flow")
         assert state is not None
         # device_class should be volume flow rate
         assert state.attributes.get("device_class") == "volume_flow_rate"
@@ -155,7 +155,7 @@ class TestSensorEntities:
         """Test the today water usage sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.today_water_usage")
+        state = hass.states.get("sensor.device123_today_water_usage")
         assert state is not None
         assert state.state == "50"
 
@@ -163,7 +163,7 @@ class TestSensorEntities:
         """Test the daily average water usage sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.water_usage_daily_average")
+        state = hass.states.get("sensor.device123_water_usage_daily_average")
         assert state is not None
         assert state.state == "45"
 
@@ -171,7 +171,7 @@ class TestSensorEntities:
         """Test the water shutoff valve state sensor through the state machine."""
         await hass.async_block_till_done()
         
-        state = hass.states.get("sensor.water_shutoff_valve_state")
+        state = hass.states.get("sensor.device123_water_shutoff_valve_state")
         assert state is not None
         assert state.state == "Open"
 
@@ -225,5 +225,5 @@ class TestSensorSetup:
         await hass.async_block_till_done()
         
         # Verify sensor exists
-        state = hass.states.get("sensor.state")
+        state = hass.states.get("sensor.device123_state")
         assert state is not None

@@ -5,6 +5,38 @@ All notable changes to the iQua Softener Home Assistant integration will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-05-18
+
+The current entity id's were not unique enough, this release updates entity id names with a prefix of the device serial to keep them unique. I recommend integrations like [Spook](https://spook.boo/) to help identify and update areas where you may have entities that need updated.
+
+### Breaking Changes
+- **Entity ID Prefixing**: All entity IDs are now prefixed with the device serial number (lowercased)
+  - Example: `sensor.state` → `sensor.sl002457123961_state`
+  - This ensures multiple iQua devices can coexist without entity ID collisions
+  - **Action required**: Update any automations, scripts, scenes, dashboards, and templates that reference old entity IDs
+  - On upgrade, a persistent notification and a Repairs issue (Settings → Repairs) will list every renamed entity ID for easy reference
+  - Entities with user-customised IDs are left untouched — only integration-generated default IDs are renamed
+
+### Added
+- **Migration Notification**: When upgrading from a prior version, a persistent notification and a Repairs issue are created listing all renamed entity IDs so users know exactly what to update
+- **Dynamic Rate-Limit Backoff**: Backoff durations are now derived from the `ratelimit-policy` response header returned by the API
+  - The library parses `ratelimit-policy` on every response and computes the token refill interval
+  - WebSocket URI fetching, WebSocket reconnection, and device detail endpoint all use this live policy value instead of a hard-coded constant
+  - If the server changes its rate-limit policy, the integration adapts automatically without requiring an update
+
+### Changed
+- **Config Entry Version**: Bumped to version 2 to trigger automatic entity ID migration on first load after upgrade
+
+## [2.1.4] - 2026-03-07
+
+### Fixed
+
+- Change unit of measurement to gal/min & L/min with correct device class
+
+### Changes
+
+- All websocket warnings are now debugs to keep the home assistant logs cleaner until we can get a more reliable websocket connection
+
 ## [2.1.3] - 2026-02-03
 
 ### Fixed
@@ -32,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full integration with coordinator pattern
 
 ### Changed
-- **WebSocket Caching**: Improved reliability with strict 300-second cache expiration
+- **WebSocket Caching*: Improved reliability with strict 300-second cache expiration
   - WebSocket URIs now expire exactly after 300 seconds (matching API expiration)
   - Increased error backoff to 120 seconds for better rate limit handling
   - Dynamic WebSocket URL construction based on api_base_url

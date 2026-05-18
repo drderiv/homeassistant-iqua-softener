@@ -41,7 +41,7 @@ DATA_SCHEMA_USER = vol.Schema(
 
 class IquaSoftenerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     data: Optional[Dict[str, Any]]
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input: Optional[Dict[str, Any]] = None):
         errors: Dict[str, str] = {}

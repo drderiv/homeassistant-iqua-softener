@@ -82,6 +82,7 @@ class IquaSoftenerWaterShutoffValveSwitch(SwitchEntity, CoordinatorEntity):
         self._attr_unique_id = f"{device_serial_number}_water_shutoff_valve".lower()
         self._attr_name = "Water Shutoff Valve"
         self._attr_icon = "mdi:valve"
+        self.entity_id = f"switch.{device_serial_number.lower()}_water_shutoff_valve"
         self._optimistic_state = None
         self._optimistic_until = None
 

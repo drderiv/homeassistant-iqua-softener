@@ -55,6 +55,7 @@ class IquaSoftenerRegenerateButton(ButtonEntity, CoordinatorEntity):
         self._attr_unique_id = f"{device_serial_number}_start_regeneration".lower()
         self._attr_name = "Start Regeneration"
         self._attr_icon = "mdi:reload"
+        self.entity_id = f"button.{device_serial_number.lower()}_start_regeneration"
 
     @property
     def available(self) -> bool:

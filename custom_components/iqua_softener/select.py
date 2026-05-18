@@ -5,6 +5,7 @@ from typing import Any, Optional, cast
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .vendor.iqua_softener import IquaSoftenerData, IquaSoftenerException
 
@@ -144,6 +145,9 @@ class IquaSoftenerSelectSetting(SelectEntity, CoordinatorEntity):
         
         # Set entity name
         self._attr_name = setting_label
+        
+        # Set default entity_id with serial prefix
+        self.entity_id = f"select.{device_serial_number.lower()}_{slugify(setting_label)}"
         
         # Set icon from SETTING_INFO if available
         info = SETTING_INFO.get(setting_name, {})
