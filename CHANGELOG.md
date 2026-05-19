@@ -5,6 +5,12 @@ All notable changes to the iQua Softener Home Assistant integration will be docu
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-05-18
+
+### Fixes
+
+- Strip/fix invalid characters from serials when migrating config
+
 ## [2.2.0] - 2026-05-18
 
 The current entity id's were not unique enough, this release updates entity id names with a prefix of the device serial to keep them unique. I recommend integrations like [Spook](https://spook.boo/) to help identify and update areas where you may have entities that need updated.
