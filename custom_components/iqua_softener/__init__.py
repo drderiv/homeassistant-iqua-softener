@@ -196,7 +196,7 @@ async def async_migrate_entry(
             )
             return False
 
-        serial_lower = device_sn.lower()
+        serial_lower = slugify(device_sn)
         entity_registry = er.async_get(hass)
         entries = er.async_entries_for_config_entry(
             entity_registry, config_entry.entry_id

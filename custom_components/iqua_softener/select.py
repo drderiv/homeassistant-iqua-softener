@@ -147,7 +147,7 @@ class IquaSoftenerSelectSetting(SelectEntity, CoordinatorEntity):
         self._attr_name = setting_label
         
         # Set default entity_id with serial prefix
-        self.entity_id = f"select.{device_serial_number.lower()}_{slugify(setting_label)}"
+        self.entity_id = f"select.{slugify(device_serial_number)}_{slugify(setting_label)}"
         
         # Set icon from SETTING_INFO if available
         info = SETTING_INFO.get(setting_name, {})
