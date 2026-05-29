@@ -52,7 +52,7 @@ The units displayed are set in the application settings.
 The integration supports real-time data updates via WebSocket connection for select sensors:
 
 - **Water Current Flow**: Updates in real-time as water flow changes
-- **WebSocket Connection**: Binary sensor showing real-time connection status
+- **WebSocket Connection**: Sensor showing real-time connection status
 - **Other sensors**: Continue to use the configured polling interval for updates
 
 This provides the best of both worlds:

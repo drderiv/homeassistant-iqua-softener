@@ -20,10 +20,6 @@ from .vendor.iqua_softener import (
 )
 
 from homeassistant import config_entries, core
-from homeassistant.components.binary_sensor import (
-    BinarySensorEntity,
-    BinarySensorDeviceClass,
-)
 from homeassistant.components.sensor import (
     SensorEntity,
     SensorDeviceClass,
@@ -905,8 +901,8 @@ class IquaSoftenerWiFiSignalStrengthSensor(IquaSoftenerSensor):
             return "mdi:wifi-off"
 
 
-class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntity):
-    """Binary sensor for WebSocket connection status."""
+class IquaSoftenerWebSocketConnectionSensor(SensorEntity, CoordinatorEntity):
+    """Sensor for WebSocket connection status."""
     
     coordinator: IquaSoftenerCoordinator  # Type hint override for proper attribute access
     
@@ -915,8 +911,9 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
         self._device_serial_number = device_serial_number
         self._attr_name = "WebSocket Connection"
         self._attr_unique_id = f"{device_serial_number}_websocket_connection".lower()
-        self.entity_id = f"binary_sensor.{slugify(device_serial_number)}_websocket_connection"
-        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+        self.entity_id = f"sensor.{slugify(device_serial_number)}_websocket_connection"
+        self._attr_device_class = SensorDeviceClass.ENUM
+        self._attr_options = ["Connected", "Disconnected"]
         self._attr_icon = "mdi:lan-connect"
         
         # Register callback for WebSocket state changes
@@ -924,7 +921,6 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
             """Handle WebSocket connection state changes."""
             try:
                 _LOGGER.debug("WebSocket state changed to: %s", "Connected" if is_connected else "Disconnected")
-                self._attr_is_on = is_connected
                 self._attr_native_value = "Connected" if is_connected else "Disconnected"
                 # Schedule state write on Home Assistant event loop
                 if self.hass:
@@ -961,12 +957,10 @@ class IquaSoftenerWebSocketConnectionSensor(BinarySensorEntity, CoordinatorEntit
         try:
             # Check WebSocket connection status directly from the iqua_softener instance
             is_connected = self.coordinator._iqua_softener.websocket_connected
-            self._attr_is_on = is_connected
             self._attr_native_value = "Connected" if is_connected else "Disconnected"
         except Exception as err:
             _LOGGER.error("Error updating WebSocket connection sensor: %s", err)
-            self._attr_is_on = False
-            self._attr_native_value = "Unknown"
+            self._attr_native_value = None
 
 
 class IquaSoftenerWaterHardnessSensor(IquaSoftenerSensor):

@@ -177,6 +177,8 @@ async def async_migrate_entry(
     multiple devices can coexist without entity-ID collisions.
     Only entities still using the integration-generated default ID are renamed;
     user-customised IDs are left untouched.
+    Version 2 → 3: Migrate WebSocket connection entity from binary_sensor
+    domain to sensor domain.
     """
     _LOGGER.info(
         "Migrating iQua Softener config entry from version %s", config_entry.version
@@ -243,6 +245,54 @@ async def async_migrate_entry(
 
         hass.config_entries.async_update_entry(config_entry, version=2)
         _LOGGER.info("iQua Softener config entry migration to version 2 complete")
+
+    if config_entry.version < 3:
+        data = dict(config_entry.data)
+        if config_entry.options:
+            data.update(config_entry.options)
+
+        device_sn = data.get(CONF_DEVICE_SERIAL_NUMBER) or data.get(
+            CONF_PRODUCT_SERIAL_NUMBER
+        )
+        if not device_sn:
+            _LOGGER.error(
+                "Cannot migrate iQua Softener entry to version 3: no device serial number in config"
+            )
+            return False
+
+        websocket_unique_id = f"{device_sn}_websocket_connection".lower()
+        entity_registry = er.async_get(hass)
+        entries = er.async_entries_for_config_entry(
+            entity_registry, config_entry.entry_id
+        )
+
+        for entry in entries:
+            if entry.domain != "binary_sensor":
+                continue
+            if entry.unique_id != websocket_unique_id:
+                continue
+
+            old_entity_id = entry.entity_id
+            object_id = old_entity_id.split(".", 1)[1]
+            new_entity_id = f"sensor.{object_id}"
+
+            if entity_registry.async_get(new_entity_id) is not None:
+                _LOGGER.warning(
+                    "Target entity_id %s already exists, skipping WebSocket migration for %s",
+                    new_entity_id,
+                    old_entity_id,
+                )
+                continue
+
+            entity_registry.async_update_entity(
+                old_entity_id, new_entity_id=new_entity_id
+            )
+            _LOGGER.info(
+                "Migrated WebSocket entity_id %s → %s", old_entity_id, new_entity_id
+            )
+
+        hass.config_entries.async_update_entry(config_entry, version=3)
+        _LOGGER.info("iQua Softener config entry migration to version 3 complete")
 
     return True
 
