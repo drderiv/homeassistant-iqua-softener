@@ -2,6 +2,8 @@
 """
 Test script to check iQua WebSocket connectivity and API rate limiting.
 
+`pip install aiohttp requests python-dotenv` to install dependencies.
+
 Tests:
 1. Rate limit headers from API responses (ratelimit-remaining, ratelimit-policy,
    ratelimit-limit) to verify the token-bucket policy is active.
@@ -44,6 +46,7 @@ from iqua_softener import IquaSoftener
 
 # Default WebSocket base URL - can be overridden
 DEFAULT_WEBSOCKET_BASE = "wss://api.myiquaapp.com"
+WEBSOCKET_BASE_OVERRIDE = ""
 
 # Property that is expected to stop publishing after ~3 minutes of inactivity
 FLOW_PROPERTY = "current_water_flow_gpm"
@@ -139,6 +142,15 @@ def check_rate_limit_headers(softener: IquaSoftener) -> None:
 
 def _build_websocket_url(softener: IquaSoftener, ws_uri: str) -> str:
     """Resolve a WebSocket URI to a fully-qualified wss:// URL."""
+    if WEBSOCKET_BASE_OVERRIDE:
+        ws_base = WEBSOCKET_BASE_OVERRIDE.rstrip("/")
+        if ws_uri.startswith("wss://") or ws_uri.startswith("ws://"):
+            path = "/" + ws_uri.split("//", 1)[1].split("/", 1)[1]
+            return f"{ws_base}{path}"
+        if ws_uri.startswith("/"):
+            return f"{ws_base}{ws_uri}"
+        return f"{ws_base}/{ws_uri}"
+
     if ws_uri.startswith("wss://") or ws_uri.startswith("ws://"):
         return ws_uri
 
@@ -186,26 +198,32 @@ async def test_websocket_connection(softener: IquaSoftener) -> bool:
         ) as ws:
             print("✓ WebSocket connected")
             message_count = 0
-            try:
-                async with asyncio.timeout(10):
-                    async for msg in ws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            try:
-                                payload = json.loads(msg.data)
-                                message_count += 1
-                                print(f"  Message {message_count}: {payload}")
-                                if message_count >= 3:
-                                    break
-                            except json.JSONDecodeError:
-                                print(f"  Invalid JSON: {msg.data}")
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            print(f"  WebSocket error: {ws.exception()}")
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                try:
+                    msg = await asyncio.wait_for(
+                        ws.receive(),
+                        timeout=max(0.1, deadline - time.monotonic()),
+                    )
+                except asyncio.TimeoutError:
+                    print("  (timeout — no further messages in 10 s)")
+                    break
+
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    try:
+                        payload = json.loads(msg.data)
+                        message_count += 1
+                        print(f"  Message {message_count}: {payload}")
+                        if message_count >= 3:
                             break
-                        elif msg.type == aiohttp.WSMsgType.CLOSE:
-                            print("  WebSocket closed by server")
-                            break
-            except asyncio.TimeoutError:
-                print("  (timeout — no further messages in 10 s)")
+                    except json.JSONDecodeError:
+                        print(f"  Invalid JSON: {msg.data}")
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    print(f"  WebSocket error: {ws.exception()}")
+                    break
+                elif msg.type == aiohttp.WSMsgType.CLOSE:
+                    print("  WebSocket closed by server")
+                    break
 
         if message_count > 0:
             print(f"✓ Received {message_count} WebSocket messages")
@@ -280,8 +298,8 @@ async def monitor_websocket_publish_window(softener: IquaSoftener) -> bool:
 
             while remaining > 0:
                 try:
-                    async with asyncio.timeout(min(remaining, 5)):
-                        msg = await ws.receive()
+                    timeout = min(remaining, 5)
+                    msg = await asyncio.wait_for(ws.receive(), timeout=timeout)
 
                     elapsed = time.monotonic() - connect_time
 
@@ -387,13 +405,27 @@ async def monitor_websocket_publish_window(softener: IquaSoftener) -> bool:
     return True
 
 
-async def run_all_tests(username: str, password: str, device_sn: str) -> bool:
+async def run_all_tests(
+    username: str,
+    password: str,
+    device_sn: str,
+    product_sn: str,
+) -> bool:
     """Authenticate once and run all verification tests."""
-    print(f"Device: {device_sn}")
+    if device_sn:
+        print(f"Device serial : {device_sn}")
+    if product_sn:
+        print(f"Product serial: {product_sn}")
 
     # ── Step 1: Authenticate & fetch initial data ─────────────────────────
     print("\n--- Authentication & Initial Data ---")
-    softener = IquaSoftener(username, password, device_sn, enable_websocket=False)
+    softener = IquaSoftener(
+        username,
+        password,
+        device_serial_number=device_sn or None,
+        product_serial_number=product_sn or None,
+        enable_websocket=False,
+    )
     try:
         data = softener.get_data()
         print("✓ Authentication successful")
@@ -422,12 +454,13 @@ def main():
 
     Credentials are read from the .env file (or environment variables).
     CLI arguments override .env values when provided:
-      python test_websocket.py [username] [password] [device_serial] [websocket_base_url]
+      python test_websocket.py [username] [password] [device_serial] [product_serial] [websocket_base_url]
     """
     # Resolve credentials: .env → env vars → CLI args
     username = os.environ.get("IQUA_USERNAME", "")
     password = os.environ.get("IQUA_PASSWORD", "")
     device_sn = os.environ.get("IQUA_DEVICE_SERIAL", "")
+    product_sn = os.environ.get("IQUA_PRODUCT_SERIAL", "")
     ws_base = os.environ.get("IQUA_WEBSOCKET_BASE", "")
 
     # CLI arguments override .env values
@@ -438,28 +471,34 @@ def main():
     if len(sys.argv) >= 4:
         device_sn = sys.argv[3]
     if len(sys.argv) >= 5:
-        ws_base = sys.argv[4]
+        if sys.argv[4].startswith(("ws://", "wss://", "http://", "https://")):
+            ws_base = sys.argv[4]
+        else:
+            product_sn = sys.argv[4]
+    if len(sys.argv) >= 6:
+        ws_base = sys.argv[5]
 
-    if not username or not password or not device_sn:
+    if not username or not password or not (device_sn or product_sn):
         print(
-            "Error: IQUA_USERNAME, IQUA_PASSWORD, and IQUA_DEVICE_SERIAL must be set "
+            "Error: IQUA_USERNAME, IQUA_PASSWORD, and either IQUA_DEVICE_SERIAL "
+            "or IQUA_PRODUCT_SERIAL must be set "
             "in .env or passed as CLI arguments."
         )
         print(
             "Usage: python test_websocket.py [username] [password] [device_serial] "
-            "[websocket_base_url]"
+            "[product_serial] [websocket_base_url]"
         )
         sys.exit(1)
 
     if ws_base:
-        global DEFAULT_WEBSOCKET_BASE  # noqa: PLW0603
-        DEFAULT_WEBSOCKET_BASE = ws_base
-        print(f"Using custom WebSocket base URL: {DEFAULT_WEBSOCKET_BASE}")
+        global WEBSOCKET_BASE_OVERRIDE  # noqa: PLW0603
+        WEBSOCKET_BASE_OVERRIDE = ws_base
+        print(f"Using custom WebSocket base URL: {WEBSOCKET_BASE_OVERRIDE}")
 
     print("iQua Rate-Limit & WebSocket Verification")
     print("=" * 45)
 
-    success = asyncio.run(run_all_tests(username, password, device_sn))
+    success = asyncio.run(run_all_tests(username, password, device_sn, product_sn))
 
     print("\n" + "=" * 45)
     if success:
@@ -471,7 +510,7 @@ def main():
     else:
         print("✗ One or more checks failed — see output above for details")
         print("\nPossible causes:")
-        print("  1. Invalid credentials or device serial number")
+        print("  1. Invalid credentials, device serial number, or product serial number")
         print("  2. Rate limit already exhausted — wait and retry")
         print("  3. Server temporarily unavailable")
 

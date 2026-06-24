@@ -535,6 +535,17 @@ class IquaSoftener:
         """Update external real-time data (for Home Assistant integration)."""
         self._external_realtime_data = realtime_data
 
+    def _build_websocket_url(self, ws_uri: str) -> str:
+        """Resolve a WebSocket URI to a fully-qualified URL."""
+        if ws_uri.startswith(("wss://", "ws://")):
+            return ws_uri
+
+        ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
+        ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
+        if ws_uri.startswith("/"):
+            return f"{ws_host}{ws_uri}"
+        return f"{ws_host}/{ws_uri}"
+
     def get_websocket_uri(self) -> Optional[str]:
         """Get WebSocket URI for external use (like Home Assistant integration)."""
         try:
@@ -543,11 +554,7 @@ class IquaSoftener:
             data = response.json()
             ws_uri = data.get("websocket_uri")
             if ws_uri:
-                # Convert HTTP(S) API base URL to WebSocket URL
-                ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
-                # Remove /v1 or any path suffix from base URL for WebSocket connection
-                ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
-                return f"{ws_host}{ws_uri}"
+                return self._build_websocket_url(ws_uri)
             return None
         except Exception as e:
             logger.error(f"Failed to get WebSocket URI: {e}")
@@ -588,11 +595,7 @@ class IquaSoftener:
                 # Reset backoff to one refill period on successful URI retrieval
                 self._websocket_backoff = self._rate_limit_backoff()
 
-                # Convert HTTP(S) API base URL to WebSocket URL
-                ws_base = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
-                # Remove /v1 or any path suffix from base URL for WebSocket connection
-                ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
-                full_uri = f"{ws_host}{ws_uri}"
+                full_uri = self._build_websocket_url(ws_uri)
                 logger.info(f"Connecting to WebSocket: {full_uri}")
 
                 if websockets is None:
