@@ -44,9 +44,9 @@ except ImportError:
 
 from iqua_softener import IquaSoftener
 
-# Default WebSocket base URL - can be overridden
-DEFAULT_WEBSOCKET_BASE = "wss://api.myiquaapp.com"
-WEBSOCKET_BASE_OVERRIDE = ""
+# Default API domain - can be overridden
+DEFAULT_API_DOMAIN = "api.myiquaapp.com"
+API_DOMAIN = DEFAULT_API_DOMAIN
 
 # Property that is expected to stop publishing after ~3 minutes of inactivity
 FLOW_PROPERTY = "current_water_flow_gpm"
@@ -142,8 +142,8 @@ def check_rate_limit_headers(softener: IquaSoftener) -> None:
 
 def _build_websocket_url(softener: IquaSoftener, ws_uri: str) -> str:
     """Resolve a WebSocket URI to a fully-qualified wss:// URL."""
-    if WEBSOCKET_BASE_OVERRIDE:
-        ws_base = WEBSOCKET_BASE_OVERRIDE.rstrip("/")
+    if API_DOMAIN:
+        ws_base = f"wss://{API_DOMAIN}"
         if ws_uri.startswith("wss://") or ws_uri.startswith("ws://"):
             path = "/" + ws_uri.split("//", 1)[1].split("/", 1)[1]
             return f"{ws_base}{path}"
@@ -155,7 +155,7 @@ def _build_websocket_url(softener: IquaSoftener, ws_uri: str) -> str:
         return ws_uri
 
     # Derive host from API base URL
-    api_base = getattr(softener, "_api_base_url", None) or "https://api.myiquaapp.com/v1"  # noqa: SLF001
+    api_base = getattr(softener, "_api_base_url", None) or _api_base_from_domain(DEFAULT_API_DOMAIN)  # noqa: SLF001
     ws_base = api_base.replace("https://", "wss://").replace("http://", "ws://")
     # Strip path components (keep only scheme://host)
     ws_host = ws_base.split("/")[0] + "//" + ws_base.split("//")[1].split("/")[0]
@@ -164,8 +164,23 @@ def _build_websocket_url(softener: IquaSoftener, ws_uri: str) -> str:
         return f"{ws_host}{ws_uri}"
 
     # Unexpected format — fall back to configured default
-    print(f"  Unexpected URI format, using default base: {DEFAULT_WEBSOCKET_BASE}")
-    return f"{DEFAULT_WEBSOCKET_BASE}{ws_uri}"
+    ws_base = f"wss://{DEFAULT_API_DOMAIN}"
+    print(f"  Unexpected URI format, using default base: {ws_base}")
+    return f"{ws_base}{ws_uri}"
+
+
+def _domain_from_url_or_domain(value: str) -> str:
+    """Normalize a domain or URL to just the host."""
+    domain = value.strip().rstrip("/")
+    if "://" in domain:
+        domain = domain.split("://", 1)[1]
+    return domain.split("/", 1)[0]
+
+
+def _api_base_from_domain(domain: str) -> str:
+    """Build the API base URL from the API domain."""
+    return f"https://{domain}/v1"
+
 
 
 async def test_websocket_connection(softener: IquaSoftener) -> bool:
@@ -410,6 +425,7 @@ async def run_all_tests(
     password: str,
     device_sn: str,
     product_sn: str,
+    api_base_url: str,
 ) -> bool:
     """Authenticate once and run all verification tests."""
     if device_sn:
@@ -424,6 +440,7 @@ async def run_all_tests(
         password,
         device_serial_number=device_sn or None,
         product_serial_number=product_sn or None,
+        api_base_url=api_base_url,
         enable_websocket=False,
     )
     try:
@@ -454,14 +471,14 @@ def main():
 
     Credentials are read from the .env file (or environment variables).
     CLI arguments override .env values when provided:
-      python test_websocket.py [username] [password] [device_serial] [product_serial] [websocket_base_url]
+      python test_websocket.py [username] [password] [device_serial] [product_serial] [api_domain]
     """
     # Resolve credentials: .env → env vars → CLI args
     username = os.environ.get("IQUA_USERNAME", "")
     password = os.environ.get("IQUA_PASSWORD", "")
     device_sn = os.environ.get("IQUA_DEVICE_SERIAL", "")
     product_sn = os.environ.get("IQUA_PRODUCT_SERIAL", "")
-    ws_base = os.environ.get("IQUA_WEBSOCKET_BASE", "")
+    api_domain = os.environ.get("IQUA_API_DOMAIN", "")
 
     # CLI arguments override .env values
     if len(sys.argv) >= 2:
@@ -471,12 +488,9 @@ def main():
     if len(sys.argv) >= 4:
         device_sn = sys.argv[3]
     if len(sys.argv) >= 5:
-        if sys.argv[4].startswith(("ws://", "wss://", "http://", "https://")):
-            ws_base = sys.argv[4]
-        else:
-            product_sn = sys.argv[4]
+        product_sn = sys.argv[4]
     if len(sys.argv) >= 6:
-        ws_base = sys.argv[5]
+        api_domain = sys.argv[5]
 
     if not username or not password or not (device_sn or product_sn):
         print(
@@ -486,19 +500,25 @@ def main():
         )
         print(
             "Usage: python test_websocket.py [username] [password] [device_serial] "
-            "[product_serial] [websocket_base_url]"
+            "[product_serial] [api_domain]"
         )
         sys.exit(1)
 
-    if ws_base:
-        global WEBSOCKET_BASE_OVERRIDE  # noqa: PLW0603
-        WEBSOCKET_BASE_OVERRIDE = ws_base
-        print(f"Using custom WebSocket base URL: {WEBSOCKET_BASE_OVERRIDE}")
+    global API_DOMAIN  # noqa: PLW0603
+    if api_domain:
+        API_DOMAIN = _domain_from_url_or_domain(api_domain)
+
+    api_base_url = _api_base_from_domain(API_DOMAIN)
+    print(f"Using API domain: {API_DOMAIN}")
+    print(f"Using API base URL: {api_base_url}")
+    print(f"Using WebSocket base URL: wss://{API_DOMAIN}")
 
     print("iQua Rate-Limit & WebSocket Verification")
     print("=" * 45)
 
-    success = asyncio.run(run_all_tests(username, password, device_sn, product_sn))
+    success = asyncio.run(
+        run_all_tests(username, password, device_sn, product_sn, api_base_url)
+    )
 
     print("\n" + "=" * 45)
     if success:
