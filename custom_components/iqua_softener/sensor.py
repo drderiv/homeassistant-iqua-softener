@@ -297,6 +297,7 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
 
         # Flag to delay WebSocket start until after bootstrap
         self._websocket_start_delayed = False
+        self._websocket_update_scheduled = False
         
         # Backoff strategy tracking
         self._failure_count = 0
@@ -305,11 +306,9 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         # This callback syncs coordinator data when WebSocket properties update
         def on_websocket_update(property_name: str):
             """Callback when WebSocket data updates - sync coordinator data."""
-            _LOGGER.debug("WebSocket property updated: %s - syncing coordinator data", property_name)
-            # Schedule async update on the event loop from this thread
-            asyncio.run_coroutine_threadsafe(
-                self._async_update_data_from_websocket(),
-                self.hass.loop
+            self.hass.loop.call_soon_threadsafe(
+                self._schedule_websocket_update,
+                property_name,
             )
         
         self._iqua_softener.set_websocket_data_update_callback(on_websocket_update)
@@ -321,6 +320,16 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
             enable_websocket,
         )
 
+    @callback
+    def _schedule_websocket_update(self, property_name: str) -> None:
+        """Schedule one coordinator update for a burst of WebSocket messages."""
+        _LOGGER.debug("WebSocket property updated: %s - scheduling coordinator update", property_name)
+        if self._websocket_update_scheduled:
+            return
+
+        self._websocket_update_scheduled = True
+        self.hass.async_create_task(self._async_update_data_from_websocket())
+
     async def _async_update_data_from_websocket(self):
         """Update coordinator data from current in-memory state without API call.
         
@@ -329,20 +338,18 @@ class IquaSoftenerCoordinator(DataUpdateCoordinator):
         sensors to reflect real-time changes without making API calls.
         """
         try:
+            await asyncio.sleep(0)
             if self.data is None:
                 return
-            
-            # Get current state from the already-updated _iqua_softener object
-            current_state = await self.hass.async_add_executor_job(
-                self._iqua_softener.get_data
-            )
-            
+
             # Update coordinator data without triggering _async_update_data()
             # This notifies all listeners (sensors) of data changes
-            self.async_set_updated_data(current_state)
+            self.async_set_updated_data(self.data)
             _LOGGER.debug("Coordinator data updated from WebSocket properties")
         except Exception as err:
             _LOGGER.debug("Error updating coordinator data from WebSocket: %s", err)
+        finally:
+            self._websocket_update_scheduled = False
 
     async def async_start_websocket(self):
         """Start the WebSocket connection using library's implementation."""
