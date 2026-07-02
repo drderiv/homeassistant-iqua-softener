@@ -729,7 +729,10 @@ class IquaSoftenerAvailableWaterSensor(IquaSoftenerSensor):
             # Use converted_value from additional_properties if available, otherwise fall back to total_water_available
             if data.additional_properties and "treated_water_avail_gals" in data.additional_properties:
                 prop = data.additional_properties["treated_water_avail_gals"]
-                self._attr_native_value = prop.get("converted_value", data.total_water_available)
+                self._attr_native_value = prop.get(
+                    "converted_value",
+                    prop.get("value", data.total_water_available),
+                )
                 # Set unit based on converted_units
                 units = prop.get("converted_units", "Gallons")
                 self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
@@ -789,7 +792,10 @@ class IquaSoftenerWaterUsageTodaySensor(IquaSoftenerSensor):
             # Use converted_value from additional_properties if available
             if data.additional_properties and "gallons_used_today" in data.additional_properties:
                 prop = data.additional_properties["gallons_used_today"]
-                self._attr_native_value = prop.get("converted_value", data.today_use)
+                self._attr_native_value = prop.get(
+                    "converted_value",
+                    prop.get("value", data.today_use),
+                )
                 # Set unit based on converted_units
                 units = prop.get("converted_units", "Gallons")
                 self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
@@ -815,7 +821,10 @@ class IquaSoftenerWaterUsageDailyAverageSensor(IquaSoftenerSensor):
             # Use converted_value from additional_properties if available
             if data.additional_properties and "avg_daily_use_gals" in data.additional_properties:
                 prop = data.additional_properties["avg_daily_use_gals"]
-                self._attr_native_value = prop.get("converted_value", data.average_daily_use)
+                self._attr_native_value = prop.get(
+                    "converted_value",
+                    prop.get("value", data.average_daily_use),
+                )
                 # Set unit based on converted_units
                 units = prop.get("converted_units", "Gallons")
                 self._attr_native_unit_of_measurement = UnitOfVolume.LITERS if units == "Liters" else UnitOfVolume.GALLONS
@@ -829,17 +838,29 @@ class IquaSoftenerWaterUsageDailyAverageSensor(IquaSoftenerSensor):
 class IquaSoftenerWaterShutoffValveStateSensor(IquaSoftenerSensor):
     def update(self, data: IquaSoftenerData):
         try:
-            if hasattr(data, "water_shutoff_valve_state"):
+            prop = (
+                data.additional_properties.get("valve_pos_switch_enum")
+                if data.additional_properties
+                else None
+            )
+            if prop is not None:
+                valve_state = prop.get("converted_value", prop.get("value"))
+            elif hasattr(data, "water_shutoff_valve_state"):
                 # Convert numeric state to text
                 valve_state = data.water_shutoff_valve_state
+            else:
+                valve_state = None
+
+            if valve_state is not None:
                 if valve_state == 1:
                     self._attr_native_value = "Open"
                 elif valve_state == 0:
                     self._attr_native_value = "Closed"
                 else:
                     self._attr_native_value = f"Unknown ({valve_state})"
-            else:
-                self._attr_native_value = "Unknown"
+                return
+
+            self._attr_native_value = "Unknown"
         except Exception as err:
             _LOGGER.error("Error updating water shutoff valve sensor: %s", err)
             if not hasattr(self, '_attr_native_value'):

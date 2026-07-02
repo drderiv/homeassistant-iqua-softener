@@ -535,6 +535,26 @@ class IquaSoftener:
         """Update external real-time data (for Home Assistant integration)."""
         self._external_realtime_data = realtime_data
 
+    def _update_cached_property_from_websocket(self, property_name: str, data: Dict[str, Any]) -> None:
+        """Merge a WebSocket property update into the cached device detail."""
+        if self._device_detail_cache is None:
+            return
+
+        properties = self._device_detail_cache.setdefault("properties", {})
+        property_data = properties.setdefault(property_name, {})
+        property_data["value"] = data.get("value")
+
+        if "converted_value" in data:
+            property_data["converted_value"] = data["converted_value"]
+        elif data.get("converted_property"):
+            converted_property = data["converted_property"]
+            property_data["converted_value"] = converted_property.get("value")
+            if converted_property.get("unit") is not None:
+                property_data["converted_units"] = converted_property.get("unit")
+
+        if "converted_units" in data:
+            property_data["converted_units"] = data["converted_units"]
+
     def _build_websocket_url(self, ws_uri: str) -> str:
         """Resolve a WebSocket URI to a fully-qualified URL."""
         if ws_uri.startswith(("wss://", "ws://")):
@@ -781,6 +801,7 @@ class IquaSoftener:
             property_name = data["name"]
             with self._websocket_lock:
                 self._realtime_data[property_name] = data
+                self._update_cached_property_from_websocket(property_name, data)
             logger.debug(
                 f"Updated real-time property: {property_name} = {data.get('value')}"
             )
