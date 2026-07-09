@@ -192,15 +192,25 @@ The vendored library will be removed once the upstream changes are merged and pu
 - Network connectivity for your Home Assistant instance
 
 ## Configuration
-To add an iQua water softener to Home assistant, go to Settings and click "+ ADD INTEGRATION" button. From list select "iQua Softener" and click it, in displayed window you must enter:
-- **API Type** - select which API to use:
-  - **iQua** (default) - for legacy Ecowater devices and existing user accounts
-  - **iQua2** - for newer Ecowater devices and new user accounts created after the migration
-- Username - username for iQua application
-- Password - password for iQua application
-- Serial number - device serial number, you can find it in iQua app device information tab and field called "DSN#" (this field is case sensitive!)
-- Update Interval (minutes) - how often to poll the iQua servers for updated data (default: 5 minutes, range: 1-60 minutes)
-- Enable Real-time Updates - enable WebSocket connection for real-time data updates (default: enabled)
+To add an iQua water softener to Home Assistant:
+
+1. Go to **Settings → Devices & Services**
+2. Click **+ Add Integration**
+3. Search for and select **iQua Softener**
+4. Enter your account and update settings:
+   - **API Type** - select which API to use:
+     - **iQua** (default) - for legacy Ecowater devices and existing user accounts
+     - **iQua2** - for newer Ecowater devices and new user accounts created after the migration
+   - **Username** - username for the iQua application
+   - **Password** - password for the iQua application
+   - **Update Interval (minutes)** - how often to poll the iQua servers for updated data (default: 5 minutes, range: 1-60 minutes)
+   - **Enable Real-time Updates** - enable WebSocket connection for real-time data updates (default: enabled)
+5. After your credentials are validated, the integration queries the iQua API for devices on your account.
+6. Select the water softener you want to add from the discovered device list.
+
+You no longer need to manually enter a device serial number or product serial number during setup. The selected device's serial information is stored automatically and is still used internally for unique device and entity IDs.
+
+If your account has multiple water softeners, repeat the setup flow and select a different device each time.
 
 ### API Type Selection
 
@@ -220,7 +230,7 @@ The integration supports both the legacy **iQua API** and the newer **iQua2 API*
 - Choose the API that matches where your account and device are registered
 - If you're unsure, try the default iQua API first - if authentication fails, switch to iQua2
 - Existing installations will automatically continue using the iQua API when upgraded
-- You can switch between APIs at any time using the Reconfigure option
+- You can switch between APIs at any time using the Reconfigure option; after changing credentials or API type, the integration will rediscover devices and ask which device to use
 
 The API selector was implemented because both APIs are architecturally identical - they use the same authentication mechanisms, return the same data structures, and support the same WebSocket connections. The only difference is which user accounts and device registrations they contain.
 
@@ -231,6 +241,23 @@ After initial setup, you can modify settings by:
 2. Find your iQua Softener integration
 3. Click **"Configure"** or the options button (⋯)
 4. Adjust the update interval or toggle real-time updates
+
+To update credentials, change API type, or select a different softener from the account, use the integration's **Reconfigure** flow. Reconfigure will ask for credentials, query the API again, and show the discovered device picker.
+
+### Device Discovery Diagnostic Script
+
+For troubleshooting API discovery outside Home Assistant, this repository includes a helper script:
+
+```bash
+IQUA_USERNAME=user@example.com IQUA_PASSWORD=secret python3 scripts/query_devices.py --raw
+```
+
+Optional arguments:
+- `--api-type iqua` or `--api-type iqua2`
+- `--api-url https://example/v1` for testing a custom endpoint
+- `--raw` to print the full `/devices` response after the summarized device list
+
+The script prints the fields the config flow uses to build the device picker, including discovered device serial and product serial values.
 
 ## Troubleshooting
 
@@ -243,9 +270,13 @@ After initial setup, you can modify settings by:
 
 **Authentication errors:**
 - Verify your iQua app credentials are correct
-- Ensure your device serial number (DSN#) is entered exactly as shown in the iQua app
 - Check that your iQua account has access to the water softener
 - **Try switching API type** - if you're using iQua but your account is on iQua2 (or vice versa), authentication will fail
+
+**No devices found during setup:**
+- Confirm the water softener appears in the official iQua app for the same account
+- Try the other API type (`iQua` vs `iQua2`)
+- Run `scripts/query_devices.py --raw` to inspect what the API returns for your account
 
 **No real-time updates:**
 - Check if "Enable Real-time Updates" is enabled in integration options
@@ -254,7 +285,7 @@ After initial setup, you can modify settings by:
 
 **Sensors showing as unavailable:**
 - Check Home Assistant logs for API errors
-- Verify the device serial number is correct
+- Reconfigure the integration and confirm the correct discovered device is selected
 - Ensure the water softener is online in the iQua app
 
 ### Enable Debug Logging

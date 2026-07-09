@@ -6,28 +6,29 @@
           "api_type": "API Type",
           "username": "Username",
           "password": "Password",
-          "device_sn": "Device Serial Number (optional)",
-          "product_sn": "Product Serial Number (optional)",
           "update_interval": "Update Interval (minutes)",
           "enable_websocket": "Enable Real-time Updates"
         },
         "data_description": {
           "api_type": "Select which API to use: iQua for legacy devices or iQua2 for newer devices"
         },
-        "description": "Enter your iQua credentials and either Device Serial Number OR Product Serial Number (not both).",
+        "description": "Enter your iQua credentials. Devices on your account will be discovered next.",
         "title": "Setup"
+      },
+      "device": {
+        "data": {
+          "selected_device": "Device"
+        },
+        "description": "Select the iQua device to add.",
+        "title": "Select Device"
       }
     },
     "error": {
-      "missing_serial_number": "Either Device Serial Number or Product Serial Number must be provided",
       "invalid_auth": "Invalid username or password. Please check your iQua app credentials.",
-      "device_not_found": "Device not found. Please verify your serial number matches the device in your iQua app.",
+      "device_missing_serial_number": "The selected device did not include a device or product serial number.",
       "cannot_connect": "Cannot connect to iQua servers. Please check your internet connection and try again.",
-      "no_data": "Unable to retrieve device data. Please verify your credentials and device serial number.",
+      "no_devices": "No devices were found on this iQua account.",
       "unknown": "An unexpected error occurred. Please try again or check the logs for more details."
-    },
-    "progress": {
-      "validating_credentials": "Validating credentials and testing device connection..."
     }
   },
   "options": {

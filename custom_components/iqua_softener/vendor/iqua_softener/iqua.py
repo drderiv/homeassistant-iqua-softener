@@ -87,9 +87,6 @@ class IquaSoftener:
         self._product_serial_number = product_serial_number
         self._api_base_url: str = api_base_url
         
-        # Validate that at least one serial number is provided
-        if not device_serial_number and not product_serial_number:
-            raise ValueError("Either device_serial_number or product_serial_number must be provided")
         self._session: Optional[requests.Session] = None
         self._access_token: Optional[str] = None
         self._refresh_token: Optional[str] = None
@@ -867,6 +864,11 @@ class IquaSoftener:
         """Get the device ID for the configured serial number."""
         if self._device_id is not None:
             return str(self._device_id)
+
+        if not self._device_serial_number and not self._product_serial_number:
+            raise IquaSoftenerException(
+                "Either device_serial_number or product_serial_number must be provided"
+            )
 
         # Get all devices and find the one with matching serial number
         devices = self._get_devices()

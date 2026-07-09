@@ -26,8 +26,10 @@ pytest_plugins = ["pytest_homeassistant_custom_component"]
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Enable custom integrations for all tests."""
+def auto_enable_custom_integrations(request):
+    """Enable custom integrations only for tests that set up Home Assistant."""
+    if "hass" in request.fixturenames or "init_integration" in request.fixturenames:
+        request.getfixturevalue("enable_custom_integrations")
     yield
 
 
